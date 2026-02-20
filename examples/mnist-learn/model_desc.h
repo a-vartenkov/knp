@@ -56,6 +56,9 @@ struct ModelDescription
     /// Path to backend, excluding platform specific name parts, like .so, .dll and etc.
     std::filesystem::path backend_path_;
 
+    /// Path to backend used for inference. By default it's the same one as used for training.
+    std::filesystem::path inference_backend_path_;
+
     /// Path to folder for saving detailed logs.
     std::filesystem::path log_path_;
 

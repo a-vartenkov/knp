@@ -38,7 +38,8 @@ std::optional<ModelDescription> parse_arguments(int argc, char** argv)
         "inference_iters,i", po::value<size_t>()->default_value(10000), "amount of images for inference")(
         "images", po::value<std::string>()->default_value("MNIST.bin"), "path to raw images file")(
         "labels", po::value<std::string>()->default_value("MNIST.target"), "path to images labels file")(
-        "backend,b", po::value<std::string>()->default_value("knp-cpu-single-threaded-backend"), "path to backend")(
+        "backend,b", po::value<std::string>()->default_value("knp-cpu-single-threaded-backend"), "selected backend")(
+        "infer_backend", po::value<std::string>()->default_value(""), "backend for inference")(
         "log_path", po::value<std::string>()->default_value(""),
         "path for putting logs. if no path is specified, no logs will be produced.")(
         "model_path", po::value<std::string>()->default_value(""),
@@ -55,6 +56,7 @@ std::optional<ModelDescription> parse_arguments(int argc, char** argv)
     }
 
     ModelDescription model_desc;
+    auto common_path = std::filesystem::weakly_canonical(std::filesystem::path(argv[0]).parent_path());
 
     if (vm.count("model"))
     {
@@ -127,13 +129,22 @@ std::optional<ModelDescription> parse_arguments(int argc, char** argv)
 
     if (vm.count("backend"))
     {
-        model_desc.backend_path_ = vm["backend"].as<std::string>();
+        model_desc.backend_path_ = common_path / vm["backend"].as<std::string>();
     }
     else
     {
         std::cout << "Backend path not specified." << std::endl;
         std::cout << desc << std::endl;
         return std::nullopt;
+    }
+
+    if (!vm.count("infer_backend") || vm["infer_backend"].empty())
+    {
+        model_desc.inference_backend_path_ = model_desc.backend_path_;
+    }
+    else
+    {
+        model_desc.inference_backend_path_ = common_path / vm["infer_backend"].as<std::string>();
     }
 
     if (vm.count("log_path"))

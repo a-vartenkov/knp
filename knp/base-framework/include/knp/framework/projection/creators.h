@@ -30,7 +30,7 @@
 #include <tuple>
 
 #include "synapse_generators.h"
-#include "synapse_parameters_generators.h"
+#include "parameter_generators/synapse_parameters_generators.h"
 
 
 /**

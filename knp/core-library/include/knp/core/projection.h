@@ -84,7 +84,7 @@ public:
     /**
      * @brief Parameters of the specified synapse type.
      */
-    using SynapseParameters = typename synapse_traits::synapse_parameters<SynapseType>;
+    using SynapseParameters = typename knp::synapse_traits::synapse_parameters<SynapseType>;
 
     /**
      * @brief Synapse description structure that contains synapse parameters and indexes of the associated neurons.

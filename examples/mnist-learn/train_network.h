@@ -173,7 +173,5 @@ void train_network(AnnotatedNetwork& network, const ModelDescription& model_desc
             return step != dataset.get_steps_amount_for_training();
         });
 
-    // TOOD this is temporary solution. backend should be loaded only once, not twice, so this line can be moved to
-    // main.
     strip_network_for_inference(*model_executor.get_backend(), network, model_desc);
 }
