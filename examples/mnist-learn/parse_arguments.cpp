@@ -138,7 +138,7 @@ std::optional<ModelDescription> parse_arguments(int argc, char** argv)
         return std::nullopt;
     }
 
-    if (!vm.count("infer_backend") || vm["infer_backend"].empty())
+    if (!vm.count("infer_backend") || vm["infer_backend"].as<std::string>().empty())
     {
         model_desc.inference_backend_path_ = model_desc.backend_path_;
     }

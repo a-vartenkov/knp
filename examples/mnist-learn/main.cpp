@@ -46,6 +46,17 @@ void run_model(const ModelDescription& model_desc)
     // Some type of models need to do some procedures, to be ready for inference.
     finalize_network<Neuron>(network, model_desc);
 
+    // For different backends we convert model to the most base neuron class.
+    if (model_desc.backend_path_ != model_desc.inference_backend_path_)
+    {
+        if (model_desc.type_ == SupportedModelType::BLIFAT)
+            network.network_.upcast_populations<knp::neuron_traits::BLIFATNeuron>();
+        else
+            network.network_.upcast_populations<knp::neuron_traits::AltAILIF>();
+
+        network.network_.upcast_projections<knp::synapse_traits::DeltaSynapse>();
+    }
+
     if (!model_desc.model_saving_path_.empty()) save_network(model_desc, network);
 
     auto inference_spikes = run_inference_on_network<Neuron>(network, model_desc, dataset);

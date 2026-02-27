@@ -49,7 +49,9 @@ template <class BaseNeuron, class DerivedNeuron>
 neuron_traits::neuron_parameters<BaseNeuron> slice_to_base_neuron(
         const neuron_traits::neuron_parameters<DerivedNeuron> &derived_params)
 {
-    static_assert(std::is_base_of_v<BaseNeuron, DerivedNeuron>);
+    static_assert(std::is_base_of_v<
+            neuron_traits::neuron_parameters<BaseNeuron>,
+            neuron_traits::neuron_parameters<DerivedNeuron>>);
     return static_cast<neuron_traits::neuron_parameters<BaseNeuron>>(derived_params);
 }
 

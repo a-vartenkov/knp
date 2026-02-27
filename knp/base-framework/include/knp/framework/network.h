@@ -268,6 +268,20 @@ public:
      */
     void remove_projection(const knp::core::UID &projection_uid);
 
+    /**
+     * @brief Upcast all synapses derived from SynapseType to SynapseType, leaving other synapses intact.
+     * @tparam BaseSynapseType base synapse type.
+     */
+    template <typename SynapseType>
+    void upcast_projections();
+
+    /**
+     * @brief Upcast all neurons derived from NeuronType to NeuronType, leaving other synapses intact.
+     * @tparam BaseNeuronType base neuron type.
+     */
+    template <typename NeuronType>
+    void upcast_populations();
+
 public:
     /**
      * @brief Connect presynaptic and postsynaptic populations and add projection to the network.

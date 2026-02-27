@@ -20,6 +20,8 @@
  */
 
 #include <knp/framework/network.h>
+#include <knp/framework/population/neuron_generators/neuron_slicing_generators.h>
+#include <knp/framework/projection/parameter_generators/synapse_slicing_generators.h>
 
 #include <spdlog/spdlog.h>
 
@@ -312,6 +314,64 @@ void Network::remove_projection(const core::UID &projection_uid)
 }
 
 
+template <typename BaseSynapseType>
+void Network::upcast_projections()
+{
+    using BaseSynapseParams = synapse_traits::synapse_parameters<BaseSynapseType>;
+
+    for (auto &projection : projections_)
+    {
+        bool is_converted = false;
+        auto new_projection = std::visit([&is_converted](const auto &proj)
+            {
+                using Synapse = typename std::remove_reference_t<decltype(proj)>::ProjectionSynapseType;
+                using SynapseParams = synapse_traits::synapse_parameters<Synapse>;
+
+                if constexpr (std::is_base_of_v<BaseSynapseParams, SynapseParams>)
+                {
+                    auto res = projection::synapse_generators::upcast_projection<synapse_traits::DeltaSynapse, Synapse>(
+                            proj);
+                    is_converted = true;
+                    return core::AllProjectionsVariant{res};
+                }
+                return core::AllProjectionsVariant{proj};  // TODO: Remove unnecessary copying.
+            }, projection);
+        if (is_converted)
+        {
+            projection = std::move(new_projection);
+        }
+    }
+}
+
+
+template <typename BaseNeuronType>
+void Network::upcast_populations()
+{
+    using BaseNeuronParams = neuron_traits::neuron_parameters<BaseNeuronType>;
+
+    for (auto &population :  populations_)
+    {
+        bool is_converted = false;
+        core::AllPopulationsVariant new_population = std::visit([&is_converted](auto &pop)
+            {
+                using NeuronType = typename std::remove_reference_t<decltype(pop)>::PopulationNeuronType;
+                using NeuronParams = neuron_traits::neuron_parameters<NeuronType>;
+                if constexpr (std::is_base_of_v<BaseNeuronParams, NeuronParams>)
+                {
+                    is_converted = true;
+                    auto res =  population::neurons_generators::upcast_population<BaseNeuronType, NeuronType>(pop);
+                    return core::AllPopulationsVariant{res};
+                }
+                return core::AllPopulationsVariant{pop};  // TODO: Remove unnecessary copying.
+            }, population);
+        if (is_converted)
+        {
+            population = std::move(new_population);
+        }
+    }
+}
+
+
 template <typename PopulationType>
 void Network::check_population_constraints(const PopulationType &population) const
 {
@@ -360,8 +420,8 @@ namespace nt = knp::neuron_traits;
     template KNP_DECLSPEC const knp::core::Population<nt::neuron_type>                                        \
         &Network::get_population<knp::neuron_traits::neuron_type>(const knp::core::UID &) const;              \
     template KNP_DECLSPEC void Network::check_population_constraints<knp::core::Population<nt::neuron_type>>( \
-        const knp::core::Population<nt::neuron_type> &) const;
-
+        const knp::core::Population<nt::neuron_type> &) const;                                                \
+    template KNP_DECLSPEC void Network::upcast_populations<knp::neuron_traits::neuron_type>();
 namespace st = knp::synapse_traits;
 
 #define INSTANCE_PROJECTION_FUNCTIONS(n, template_for_instance, synapse_type)                                       \
@@ -377,7 +437,8 @@ namespace st = knp::synapse_traits;
     template KNP_DECLSPEC const knp::core::Projection<st::synapse_type> &Network::get_projection<st::synapse_type>( \
         const knp::core::UID &) const;                                                                              \
     template KNP_DECLSPEC void Network::check_projection_constraints<knp::core::Projection<st::synapse_type>>(      \
-        const knp::core::Projection<st::synapse_type> &) const;
+        const knp::core::Projection<st::synapse_type> &) const;                                                     \
+    template KNP_DECLSPEC void Network::upcast_projections<st::synapse_type>();                                                                                                                    \
 // cppcheck-suppress unknownMacro
 BOOST_PP_SEQ_FOR_EACH(INSTANCE_POPULATION_FUNCTIONS, "", BOOST_PP_VARIADIC_TO_SEQ(ALL_NEURONS))
 // cppcheck-suppress unknownMacro
