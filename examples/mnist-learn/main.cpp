@@ -38,17 +38,16 @@ template <typename Neuron>
 void run_model(const ModelDescription& model_desc)
 {
     Dataset dataset = process_dataset(model_desc);
-
-    AnnotatedNetwork network = construct_network<Neuron>(model_desc);
-
-    train_network<Neuron>(network, model_desc, dataset);
-
-    // Some type of models need to do some procedures, to be ready for inference.
-    finalize_network<Neuron>(network, model_desc);
-
-    // For different backends we convert model to the most base neuron class.
-    if (model_desc.backend_path_ != model_desc.inference_backend_path_)
+    AnnotatedNetwork network;
+    if (!model_desc.inference_only_)
     {
+        network = construct_network<Neuron>(model_desc);
+        train_network<Neuron>(network, model_desc, dataset);
+
+        // Some type of models need to do some procedures, to be ready for inference.
+        finalize_network<Neuron>(network, model_desc);
+
+        // Сonvert model to the most base neuron and synapse classes.
         if (model_desc.type_ == SupportedModelType::BLIFAT)
             network.network_.upcast_populations<knp::neuron_traits::BLIFATNeuron>();
         else
@@ -56,8 +55,27 @@ void run_model(const ModelDescription& model_desc)
 
         network.network_.upcast_projections<knp::synapse_traits::DeltaSynapse>();
     }
-
-    if (!model_desc.model_saving_path_.empty()) save_network(model_desc, network);
+    if (!model_desc.model_saving_path_.empty())
+    {
+        if (!model_desc.inference_only_)
+        {
+            save_network(model_desc, network);
+        }
+        knp::framework::Network new_network = knp::framework::sonata::load_network(model_desc.model_saving_path_);
+        if (new_network.populations_count() != network.network_.populations_count()
+        || new_network.projections_count() != network.network_.projections_count())
+        {
+            std::cout << "Populations " << new_network.populations_count() << " vs. "
+                      << network.network_.populations_count() << std::endl;
+            std::cout << "Projections: " << new_network.projections_count() << " vs. "
+                      << network.network_.projections_count() << std::endl;
+        }
+        network.network_ = new_network;
+    }
+    else if (model_desc.inference_only_) // inference without model saving.
+    {
+        throw std::runtime_error("Model leading path is not defined for inference-only mode");
+    };
 
     auto inference_spikes = run_inference_on_network<Neuron>(network, model_desc, dataset);
 

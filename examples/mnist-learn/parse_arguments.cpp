@@ -25,6 +25,7 @@
 #include <string>
 
 #include <boost/program_options.hpp>
+#include <spdlog/spdlog.h>
 
 
 namespace po = boost::program_options;
@@ -43,7 +44,8 @@ std::optional<ModelDescription> parse_arguments(int argc, char** argv)
         "log_path", po::value<std::string>()->default_value(""),
         "path for putting logs. if no path is specified, no logs will be produced.")(
         "model_path", po::value<std::string>()->default_value(""),
-        "path for saving trained model. if no path is specified, model wont be saved.");
+        "path for saving trained model. if no path is specified, model wont be saved.")(
+        "load_only,l", "don't do training, use model_path for loading model.");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -163,6 +165,19 @@ std::optional<ModelDescription> parse_arguments(int argc, char** argv)
     else
     {
         model_desc.model_saving_path_ = "";
+    }
+
+    if (vm.count("load_only"))
+    {
+        if (model_desc.model_saving_path_.empty())
+        {
+            SPDLOG_ERROR("No model path specified for inference-only mode.");
+        }
+        model_desc.inference_only_ = true;
+    }
+    else
+    {
+        model_desc.inference_only_ = false;
     }
 
     return model_desc;
