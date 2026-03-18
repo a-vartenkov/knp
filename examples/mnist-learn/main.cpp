@@ -23,10 +23,10 @@
 
 #include "dataset.h"
 #include "evaluate_results.h"
+#include "inference.h"
 #include "parse_arguments.h"
-#include "run_inference_on_network.h"
 #include "save_network.h"
-#include "train_network.h"
+#include "training.h"
 
 
 /**
@@ -39,19 +39,18 @@ void run_model(const ModelDescription& model_desc)
 {
     Dataset dataset = process_dataset(model_desc);
     AnnotatedNetwork network;
+    knp::framework::BackendLoader backend_loader;
     if (!model_desc.inference_only_)
     {
+        // Online Help link: https://click.kaspersky.com/?hl=en-US&version=2.0&pid=KNP&link=online_help&helpid=243548
         network = construct_network<Neuron>(model_desc);
-        train_network<Neuron>(network, model_desc, dataset);
-
-        // Some type of models need to do some procedures, to be ready for inference.
-        finalize_network<Neuron>(network, model_desc);
-
+        train_model<Neuron>(model_desc, dataset, network, backend_loader);
         // Сonvert model to the most base neuron and synapse classes.
         if (model_desc.type_ == SupportedModelType::BLIFAT)
             network.network_.upcast_populations<knp::neuron_traits::BLIFATNeuron>();
-        else
+        else if (model_desc.type_ == SupportedModelType::AltAI)
             network.network_.upcast_populations<knp::neuron_traits::AltAILIF>();
+        else throw std::runtime_error("Unsupported model type");
 
         network.network_.upcast_projections<knp::synapse_traits::DeltaSynapse>();
     }
@@ -77,7 +76,7 @@ void run_model(const ModelDescription& model_desc)
         throw std::runtime_error("Model leading path is not defined for inference-only mode");
     };
 
-    auto inference_spikes = run_inference_on_network<Neuron>(network, model_desc, dataset);
+    auto inference_spikes = infer_model<Neuron>(model_desc, dataset, network, backend_loader);
 
     evaluate_results(inference_spikes, dataset);
 }
