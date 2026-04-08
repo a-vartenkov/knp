@@ -29,11 +29,9 @@
 #include "message_bus.cuh"
 
 #include "../cuda_lib/vector.cuh"
-#include "../cuda_lib/register_type.cuh"
+#include "../cuda_lib/register_all.cuh"
 #include "../cuda_lib/get_blocks_config.cuh"
 
-
-REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::MessageVariant);
 
 namespace knp::backends::gpu::cuda
 {
@@ -284,6 +282,9 @@ __host__ bool same_sender(const knp::core::messaging::MessageVariant &message,
  */
 __host__ void CUDAMessageBus::sync_with_host()
 {
+    int device;
+    cudaGetDevice(&device);
+    SPDLOG_DEBUG("Current CUDA device: {}", device);
     for (const auto &cpu_subscription : cpu_endpoint_.get_endpoint_subscriptions())
     {
         cuda::Subscription gpu_sub{cpu_subscription.second};
@@ -364,3 +365,10 @@ BOOST_PP_SEQ_FOR_EACH(INSTANCE_MESSAGES_FUNCTIONS, "", BOOST_PP_VARIADIC_TO_SEQ(
 
 
 }  // namespace knp::backends::gpu::cuda
+
+REGISTER_CUDA_VECTOR_TYPE(uint64_t);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::Subscription);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::MessageVariant);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::SpikeMessage);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::SynapticImpactMessage);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::UID);

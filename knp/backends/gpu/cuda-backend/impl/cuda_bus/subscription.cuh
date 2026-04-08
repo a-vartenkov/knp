@@ -55,7 +55,7 @@ public:
     /**
      * @brief Internal container for UIDs.
      */
-    using UidSet = device_lib::CUDAVector<UID>;
+    using UidSet = device_lib::CUDAVector<cuda::UID>;
 
 public:
     Subscription() = default;
@@ -85,6 +85,14 @@ public:
             add_sender(*(senders.data() + i));
         }
     }
+
+    /**
+     * @brief Copy constructor.
+     * @param other other instance of Subscription.
+     */
+    __host__ __device__ Subscription(const Subscription &other)
+        : receiver_(other.receiver_), senders_(other.senders_), type_index_(other.type_index_)
+    {}
 
     /**
      * @brief Subscription constructor.

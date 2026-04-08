@@ -37,6 +37,7 @@
 #include "cu_alloc.cuh"
 
 #include "extraction.cuh"
+#include "fast_error_check.cuh"
 #include "printf.cuh"
 #include "vector_kernels.cuh"
 
@@ -323,8 +324,9 @@ public:
         #ifdef __CUDA_ARCH__
         data_[index] = value;
         #else
-        SPDLOG_TRACE("Cuda vector: setting value at index {}", index);
+        // SPDLOG_TRACE("Cuda vector: setting value at index {}", index);
         gpu_insert<T>(value, data_ + index);
+        cudaDeviceSynchronize();
         #endif
         return true;
     }
@@ -366,8 +368,11 @@ public:
         Allocator::construct(data_ + size_, value);
         ++size_;
     #else
+        FAST_ERROR_CHECK(typeid(T).name() + std::string(" Push back, starting: {}"));
         resize(size_ + 1);
+        FAST_ERROR_CHECK(typeid(T).name() + std::string(" Push back, resize: {}"));
         set(size_ - 1, value);
+        FAST_ERROR_CHECK(typeid(T).name() + std::string(" Push back, set: {}"));
     #endif
     }
 
@@ -379,10 +384,13 @@ public:
 
     __host__ __device__ void reserve(size_type new_capacity)
     {
-        if (new_capacity <= capacity_) return;
+         if (new_capacity <= capacity_) return;
         #ifdef __CUDA_ARCH__
         dev_reserve(new_capacity);
         #else
+        cudaError_t result = cudaGetLastError();
+        if (result != cudaSuccess) SPDLOG_ERROR("Starting with an error already: {}", result);
+
         SPDLOG_TRACE("Reserving cuda vector with size {} and capacity {} for capacity {}", size_, capacity_,
                      new_capacity);
         T* new_data = allocator_.allocate(new_capacity);
@@ -391,12 +399,43 @@ public:
         if (num_threads > 0)
         {
             SPDLOG_TRACE("Running copy construct kernel with {} blocks and {} threads.", num_blocks, num_threads);
-            copy_construct_kernel<<<num_blocks, num_threads>>>(new_data, size_, data_);
-            cudaDeviceSynchronize();
-            auto result = cudaGetLastError();
+            // TEMP
+            cudaFuncAttributes attr;
+            result = cudaFuncGetAttributes(&attr, copy_construct_kernel<T>);
             if (result != cudaSuccess)
             {
-                SPDLOG_WARN("Error: {}", cudaGetErrorString(result));
+                SPDLOG_ERROR("Failed to get kernel attributes: {}", cudaGetErrorString(result));
+                return;
+            }
+            result = cudaGetLastError();
+            if (result != cudaSuccess)
+            {
+                SPDLOG_ERROR("Unknown error: {}", cudaGetErrorString(result));
+            }
+            else
+            {
+                SPDLOG_DEBUG("No old errors!");
+            }
+            SPDLOG_DEBUG("Attributes are: version {}, local size {}, max dyn size {}", attr.binaryVersion,
+                         attr.localSizeBytes, attr.maxDynamicSharedSizeBytes);
+            // END TEMP
+
+            // TEMP
+            cudaMemcpy(new_data, data_, size_ * sizeof(T), cudaMemcpyDeviceToDevice); // delete this!
+            // END TEMP
+            // copy_construct_kernel<T><<<num_blocks, num_threads>>>(new_data, size_, data_); // uncomment this!
+            result = cudaGetLastError();
+            if (result != cudaSuccess)
+            {
+                SPDLOG_ERROR("Failed to start kernel: {}!", cudaGetErrorString(result));
+                return;
+            }
+            cudaDeviceSynchronize();
+            result = cudaGetLastError();
+            if (result != cudaSuccess)
+            {
+                SPDLOG_WARN("Failed to run kernel function: {}", cudaGetErrorString(result));
+                return;
             }
             SPDLOG_TRACE("Running destruct kernel with {} blocks and {} threads", num_blocks, num_threads);
             destruct_kernel<T, Allocator><<<num_blocks, num_threads>>>(data_, size_);
@@ -418,13 +457,16 @@ public:
         if (new_size > size_)
         {
             reserve(new_size);
+            FAST_ERROR_CHECK(typeid(T).name() + std::string(" Resize: reserve: {}"));
             auto [num_blocks, num_threads] = get_blocks_config(new_size - size_);
             construct_kernel<T, Allocator><<<num_blocks, num_threads>>>(data_ + size_, new_size - size_);
+            FAST_ERROR_CHECK(typeid(T).name() + std::string(" Resize: construct_kernel {}"));
         }
         else if (new_size < size_)
         {
             auto [num_blocks, num_threads] = get_blocks_config(size_ - new_size);
             destruct_kernel<T, Allocator><<<num_blocks, num_threads>>>(data_ + new_size, size_ - new_size);
+            FAST_ERROR_CHECK(typeid(T).name() + std::string("Resize: destruct_kernel     {}"));
         }
         cudaDeviceSynchronize();
         size_ = new_size;
@@ -492,6 +534,7 @@ public:
      */
     __host__ __device__ void actualize()
     {
+
         if (!size_)
         {
             data_ = nullptr;
@@ -504,10 +547,12 @@ public:
         for (size_t i = 0; i < size_; ++i)
             new (data_ + i) T(*(source_data + i));
     #else
+        FAST_ERROR_CHECK(typeid(T).name() + std::string(" Starting actualize: {}"));
         SPDLOG_TRACE("Actualizing vector of {}.", typeid(T).name());
         auto [num_blocks, num_threads] = get_blocks_config(size_);
         copy_construct_kernel<<<num_blocks, num_threads>>>(data_, size_, source_data);
         cudaDeviceSynchronize();
+        FAST_ERROR_CHECK(typeid(T).name() + std::string(" Finish actualize: {}"));
         SPDLOG_TRACE("Done actualizing vector");
     #endif
     }

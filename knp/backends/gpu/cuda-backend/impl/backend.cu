@@ -20,6 +20,8 @@
  */
 
 #include "backend_impl.cuh"
+#include "cuda_lib/fast_error_check.cuh"
+#include "cuda_lib/register_all.cuh"
 
 #include <spdlog/spdlog.h>
 
@@ -157,9 +159,9 @@ void CUDABackend::start_learning()
 void CUDABackend::load_populations(const std::vector<PopulationVariants> &populations)
 {
     SPDLOG_DEBUG("Loading populations [{}]...", populations.size());
-
+    FAST_ERROR_CHECK("Loading populations already with an error: {}");
     impl_->load_populations(populations);
-
+    FAST_ERROR_CHECK("An error occured during population loading: {}");
     SPDLOG_DEBUG("All populations loaded.");
 }
 
@@ -169,8 +171,17 @@ void CUDABackend::load_projections(const std::vector<ProjectionVariants> &projec
     SPDLOG_DEBUG("Loading projections [{}]...", projections.size());
 
     //    projections_ = projections;
+    auto error = cudaGetLastError();
+    if (error != cudaSuccess)
+    {
+        SPDLOG_ERROR("Running projections with error: {}", error);
+    }
     impl_->load_projections(projections);
-
+    error = cudaGetLastError();
+    if (error != cudaSuccess)
+    {
+        SPDLOG_ERROR("Loaded projections with error: {}", error);
+    }
     SPDLOG_DEBUG("All projections loaded.");
 }
 
@@ -178,7 +189,18 @@ void CUDABackend::load_projections(const std::vector<ProjectionVariants> &projec
 void CUDABackend::load_all_projections(const std::vector<knp::core::AllProjectionsVariant> &projections)
 {
     SPDLOG_DEBUG("Loading projections [{}]...", projections.size());
+    auto error = cudaGetLastError();
+    if (error != cudaSuccess)
+    {
+        SPDLOG_ERROR("1 {}", error);
+    }
     knp::meta::load_from_container<SupportedProjections>(projections, projections_);
+    error = cudaGetLastError();
+    if (error != cudaSuccess)
+    {
+        SPDLOG_ERROR("load from container {}", error);
+    }
+    load_projections(projections_);
     SPDLOG_DEBUG("All projections loaded.");
 }
 
@@ -186,7 +208,23 @@ void CUDABackend::load_all_projections(const std::vector<knp::core::AllProjectio
 void CUDABackend::load_all_populations(const std::vector<knp::core::AllPopulationsVariant> &populations)
 {
     SPDLOG_DEBUG("Loading populations [{}]...", populations.size());
+    auto error = cudaGetLastError();
+    if (error != cudaSuccess)
+    {
+        SPDLOG_ERROR("2 {}", error);
+    }
     knp::meta::load_from_container<SupportedPopulations>(populations, populations_);
+    error = cudaGetLastError();
+    if (error != cudaSuccess)
+    {
+        SPDLOG_ERROR("22 {}", error);
+    }
+    load_populations(populations_);
+    error = cudaGetLastError();
+    if (error != cudaSuccess)
+    {
+        SPDLOG_ERROR("222 {}", error);
+    }
     SPDLOG_DEBUG("All populations loaded.");
 }
 
@@ -292,3 +330,13 @@ CUDABackend::ProjectionConstIterator CUDABackend::end_projections() const
 BOOST_DLL_ALIAS(knp::backends::gpu::CUDABackend::create, create_knp_backend)
 
 }  // namespace knp::backends::gpu
+
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDABackendImpl::PopulationVariants);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDABackendImpl::ProjectionVariants);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAPopulation<knp::neuron_traits::BLIFATNeuron>);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAProjection<knp::synapse_traits::DeltaSynapse>);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAProjection<knp::synapse_traits::DeltaSynapse>::Synapse);
+REGISTER_CUDA_VECTOR_TYPE(uint64_t);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::Subscription);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::MessageVariant);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::UID);

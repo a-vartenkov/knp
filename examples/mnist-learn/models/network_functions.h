@@ -73,3 +73,35 @@ std::function<knp::core::messaging::SpikeData(knp::core::Step)> make_training_la
 {
     throw std::runtime_error("Not supported neuron type.");
 }
+
+/**
+ * @brief Replace wta with projections.
+ * @note We have to do this because AltAI does not support WTA.
+ * @param network Annotated network.
+ */
+static void replace_wta_with_projections(AnnotatedNetwork& network)
+{
+    for (const auto& wta_data : network.data_.wta_data_)
+    {
+        for (const auto& sender : wta_data.first)
+        {
+            for (const auto& receiver : wta_data.second)
+            {
+                std::visit(
+                        [&network, &sender, &receiver](auto& proj)
+                        {
+                            using ProjType = std::remove_reference_t<decltype(proj)>;
+                            using SynapseType = typename ProjType::ProjectionSynapseType;
+                            auto proj_copy =
+                                    knp::framework::projection::creators::clone_projection<SynapseType, SynapseType>(
+                                            proj, [&proj](size_t index) { return std::get<knp::core::synapse_data>(proj[index]); },
+                                            sender, proj.get_postsynaptic());
+                            network.network_.remove_projection(receiver);
+                            network.network_.add_projection(proj_copy);
+                        },
+                        network.network_.get_projection(receiver));
+            }
+        }
+    }
+    network.data_.wta_data_.clear();
+}

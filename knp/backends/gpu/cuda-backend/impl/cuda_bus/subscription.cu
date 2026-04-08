@@ -20,6 +20,7 @@
  */
 #include "subscription.cuh"
 #include "../cuda_lib/vector.cuh"
+#include "../cuda_lib/register_all.cuh"
 
 #include <variant>
 #include <knp/core/messaging/message_envelope.h>
@@ -54,3 +55,9 @@ __host__ Subscription::Subscription(const knp::core::MessageEndpoint::Subscripti
 }
 
 } // namespace knp::backends::gpu::cuda
+
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::Subscription);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::UID);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::MessageVariant);
+REGISTER_CUDA_VECTOR_TYPE(uint64_t);
+

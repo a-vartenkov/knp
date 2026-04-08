@@ -38,8 +38,10 @@
 #include "projection.cuh"
 #include "population.cuh"
 
+#include "cuda_lib/fast_error_check.cuh"
 #include "cuda_lib/get_blocks_config.cuh"
 #include "cuda_lib/printf.cuh"
+#include "cuda_lib/register_all.cuh"
 #include "cuda_lib/vector.cuh"
 #include "cuda_bus/messaging.cuh"
 
@@ -324,8 +326,9 @@ void CUDABackendImpl::load_populations(const knp::backends::gpu::CUDABackend::Po
     SPDLOG_DEBUG("Loading populations [{}]...", populations.size());
 
     device_populations_.clear();
+    FAST_ERROR_CHECK("Cleaning populations: {}");
     device_populations_.reserve(populations.size());
-
+    FAST_ERROR_CHECK("Reserving: {}");
     for (const auto &population : populations)
     {
         ::std::visit([this](auto &arg)
@@ -335,6 +338,7 @@ void CUDABackendImpl::load_populations(const knp::backends::gpu::CUDABackend::Po
             auto pop = CUDAPopulation<typename CPUPopulationType::PopulationNeuronType>(arg);
             device_populations_.push_back(pop);
         }, population);
+        FAST_ERROR_CHECK("Loaded a population: {}   ");
     }
 
     SPDLOG_DEBUG("All populations loaded.");
@@ -858,3 +862,13 @@ __host__ __device__ CUDABackendImpl::ProjectionConstIterator CUDABackendImpl::en
 }
 
 }  // namespace knp::backends::gpu::cuda
+
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDABackendImpl::PopulationVariants);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDABackendImpl::ProjectionVariants);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAPopulation<knp::neuron_traits::BLIFATNeuron>);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAProjection<knp::synapse_traits::DeltaSynapse>);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAProjection<knp::synapse_traits::DeltaSynapse>::Synapse);
+REGISTER_CUDA_VECTOR_TYPE(uint64_t);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::Subscription);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::MessageVariant);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::UID);

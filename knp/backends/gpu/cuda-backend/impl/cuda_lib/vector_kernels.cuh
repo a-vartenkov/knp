@@ -46,7 +46,7 @@ __global__ void construct_kernel(T *data, size_t num_values)
     if (0 == num_values) return;
     size_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= num_values) return;
-    printf("Construct kernel at %p, size: %lu\n", data + i, num_values);
+    // printf("Construct kernel at %p, size: %lu\n", data + i, num_values);
 
     Allocator::construct(data + i);
 }
@@ -57,7 +57,7 @@ __global__ void copy_construct_kernel(T* data_to, size_t num_objects, const T* d
 {
     if (0 == num_objects) return;
     size_t i = blockIdx.x * blockDim.x + threadIdx.x;
-    printf("Copy construct kernel: index %lu, from %p to %p\n", i, data_from + i, data_to + i);
+    // printf("Copy construct kernel: index %lu, from %p to %p\n", i, data_from + i, data_to + i);
     if (i >= num_objects) return;
     new (data_to + i) T(*(data_from + i));
 }

@@ -152,7 +152,7 @@ std::optional<ModelDescription> parse_arguments(int argc, char** argv)
     }
     else
     {
-        model_desc.inference_backend_path_ = common_path / vm["infer_backend"].as<std::string>();
+        model_desc.inference_backend_path_ = common_path / vm["inference_backend"].as<std::string>();
     }
 
     if (vm.count("log_path"))
