@@ -399,31 +399,7 @@ public:
         if (num_threads > 0)
         {
             SPDLOG_TRACE("Running copy construct kernel with {} blocks and {} threads.", num_blocks, num_threads);
-            // TEMP
-            cudaFuncAttributes attr;
-            result = cudaFuncGetAttributes(&attr, copy_construct_kernel<T>);
-            if (result != cudaSuccess)
-            {
-                SPDLOG_ERROR("Failed to get kernel attributes: {}", cudaGetErrorString(result));
-                return;
-            }
-            result = cudaGetLastError();
-            if (result != cudaSuccess)
-            {
-                SPDLOG_ERROR("Unknown error: {}", cudaGetErrorString(result));
-            }
-            else
-            {
-                SPDLOG_DEBUG("No old errors!");
-            }
-            SPDLOG_DEBUG("Attributes are: version {}, local size {}, max dyn size {}", attr.binaryVersion,
-                         attr.localSizeBytes, attr.maxDynamicSharedSizeBytes);
-            // END TEMP
-
-            // TEMP
-            cudaMemcpy(new_data, data_, size_ * sizeof(T), cudaMemcpyDeviceToDevice); // delete this!
-            // END TEMP
-            // copy_construct_kernel<T><<<num_blocks, num_threads>>>(new_data, size_, data_); // uncomment this!
+            copy_construct_kernel<T><<<num_blocks, num_threads>>>(new_data, size_, data_);
             result = cudaGetLastError();
             if (result != cudaSuccess)
             {

@@ -171,17 +171,9 @@ void CUDABackend::load_projections(const std::vector<ProjectionVariants> &projec
     SPDLOG_DEBUG("Loading projections [{}]...", projections.size());
 
     //    projections_ = projections;
-    auto error = cudaGetLastError();
-    if (error != cudaSuccess)
-    {
-        SPDLOG_ERROR("Running projections with error: {}", error);
-    }
+    FAST_ERROR_CHECK("Running projections with error: {}");
     impl_->load_projections(projections);
-    error = cudaGetLastError();
-    if (error != cudaSuccess)
-    {
-        SPDLOG_ERROR("Loaded projections with error: {}", error);
-    }
+    FAST_ERROR_CHECK("Loaded projections with error: {}");
     SPDLOG_DEBUG("All projections loaded.");
 }
 
@@ -189,17 +181,9 @@ void CUDABackend::load_projections(const std::vector<ProjectionVariants> &projec
 void CUDABackend::load_all_projections(const std::vector<knp::core::AllProjectionsVariant> &projections)
 {
     SPDLOG_DEBUG("Loading projections [{}]...", projections.size());
-    auto error = cudaGetLastError();
-    if (error != cudaSuccess)
-    {
-        SPDLOG_ERROR("1 {}", error);
-    }
+    FAST_ERROR_CHECK("1 {}");
     knp::meta::load_from_container<SupportedProjections>(projections, projections_);
-    error = cudaGetLastError();
-    if (error != cudaSuccess)
-    {
-        SPDLOG_ERROR("load from container {}", error);
-    }
+    FAST_ERROR_CHECK("2 {}");
     load_projections(projections_);
     SPDLOG_DEBUG("All projections loaded.");
 }
@@ -208,23 +192,11 @@ void CUDABackend::load_all_projections(const std::vector<knp::core::AllProjectio
 void CUDABackend::load_all_populations(const std::vector<knp::core::AllPopulationsVariant> &populations)
 {
     SPDLOG_DEBUG("Loading populations [{}]...", populations.size());
-    auto error = cudaGetLastError();
-    if (error != cudaSuccess)
-    {
-        SPDLOG_ERROR("2 {}", error);
-    }
+    FAST_ERROR_CHECK("2 {}");
     knp::meta::load_from_container<SupportedPopulations>(populations, populations_);
-    error = cudaGetLastError();
-    if (error != cudaSuccess)
-    {
-        SPDLOG_ERROR("22 {}", error);
-    }
+    FAST_ERROR_CHECK("22 {}");
     load_populations(populations_);
-    error = cudaGetLastError();
-    if (error != cudaSuccess)
-    {
-        SPDLOG_ERROR("222 {}", error);
-    }
+    FAST_ERROR_CHECK("222 {}");
     SPDLOG_DEBUG("All populations loaded.");
 }
 
