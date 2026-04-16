@@ -367,6 +367,8 @@ BOOST_PP_SEQ_FOR_EACH(INSTANCE_MESSAGES_FUNCTIONS, "", BOOST_PP_VARIADIC_TO_SEQ(
 }  // namespace knp::backends::gpu::cuda
 
 REGISTER_CUDA_VECTOR_TYPE(uint64_t);
+REGISTER_CUDA_VECTOR_TYPE(unsigned int);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::device_lib::CUDAVector<uint64_t>);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::Subscription);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::MessageVariant);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::SpikeMessage);

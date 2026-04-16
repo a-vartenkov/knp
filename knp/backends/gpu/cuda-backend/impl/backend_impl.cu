@@ -82,14 +82,14 @@ template <>
 void gpu_insert<CUDABackendImpl::ProjectionVariants>(const CUDABackendImpl::ProjectionVariants &,
                                                      CUDABackendImpl::ProjectionVariants *);
 
-namespace detail
-{
-    template <class Variant, class Instance>
-    __global__ void make_variant_kernel(Variant *result, Instance *source)
-    {
-        new (result) Variant(*source);
-    }
-}
+//namespace detail
+//{
+//    template <class Variant, class Instance>
+//    __global__ void make_variant_kernel(Variant *result, Instance *source)
+//    {
+//        new (result) Variant(*source);
+//    }
+//}
 
 
 template<class TypeVariant, size_t index>
@@ -155,7 +155,9 @@ void gpu_insert<CUDABackendImpl::ProjectionVariants>(const CUDABackendImpl::Proj
                        {
                            using ValueType = std::decay_t<decltype(val)>;
                            ValueType *buffer;
+                           SPDLOG_DEBUG("Calling cudaMalloc for {} bytes", sizeof(ValueType));
                            call_and_check(cudaMalloc(&buffer, sizeof(ValueType)));
+                           SPDLOG_DEBUG("Buffer is {}, calling gpu_insert", (void *)buffer);
                            gpu_insert(val, buffer);
                            device_lib::make_variant_kernel<<<1, 1>>>(gpu_target, buffer);
                            call_and_check(cudaFree(buffer));
@@ -326,16 +328,19 @@ void CUDABackendImpl::load_populations(const knp::backends::gpu::CUDABackend::Po
     SPDLOG_DEBUG("Loading populations [{}]...", populations.size());
 
     device_populations_.clear();
+    cudaDeviceSynchronize(); // TEMP
     FAST_ERROR_CHECK("Cleaning populations: {}");
     device_populations_.reserve(populations.size());
+    cudaDeviceSynchronize(); // TEMP
     FAST_ERROR_CHECK("Reserving: {}");
     for (const auto &population : populations)
     {
         ::std::visit([this](auto &arg)
         {
             using CPUPopulationType = std::decay_t<decltype(arg)>;
-
+            FAST_ERROR_CHECK("Before creating population: {}");
             auto pop = CUDAPopulation<typename CPUPopulationType::PopulationNeuronType>(arg);
+            FAST_ERROR_CHECK("Creating population: {}");
             device_populations_.push_back(pop);
         }, population);
         FAST_ERROR_CHECK("Loaded a population: {}   ");
@@ -348,9 +353,11 @@ void CUDABackendImpl::load_populations(const knp::backends::gpu::CUDABackend::Po
 void CUDABackendImpl::load_projections(const knp::backends::gpu::CUDABackend::ProjectionContainer &projections)
 {
     SPDLOG_DEBUG("Loading projections [{}]...", projections.size());
-
+    FAST_ERROR_CHECK("Starting to load, already an error: {}");
     device_projections_.clear();
+    FAST_ERROR_CHECK("Cleared device projections: {}");
     device_projections_.reserve(projections.size());
+    FAST_ERROR_CHECK("Reserving device projections: {}");
 
     for (const auto &projection : projections)
     {
@@ -359,7 +366,15 @@ void CUDABackendImpl::load_projections(const knp::backends::gpu::CUDABackend::Pr
             using CPUProjectionType = std::decay_t<decltype(arg)>;
 
             auto proj = CUDAProjection<typename CPUProjectionType::ProjectionSynapseType>{arg};
-            device_projections_.push_back(proj);
+            SPDLOG_DEBUG("Pushing back a projection, size before: {}, pointer before: {}, capacity {}",
+                         device_projections_.size(),
+                         reinterpret_cast<void *>(device_projections_.data()),
+                         device_projections_.capacity());
+            device_projections_.push_back(std::move(proj));
+            FAST_ERROR_CHECK("Pushed back {}");
+            SPDLOG_DEBUG("Pushed back: size after: {}, pointer after: {}, capacity {}", device_projections_.size(),
+                             reinterpret_cast<void *>(device_projections_.data()), device_projections_.capacity());
+
         }, projection);
     }
 
@@ -868,6 +883,9 @@ REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDABackendImpl::ProjectionV
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAPopulation<knp::neuron_traits::BLIFATNeuron>);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAProjection<knp::synapse_traits::DeltaSynapse>);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAProjection<knp::synapse_traits::DeltaSynapse>::Synapse);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAPopulation<knp::neuron_traits::BLIFATNeuron>::NeuronParameters);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::device_lib::CUDAVector<uint64_t>);
+REGISTER_CUDA_VECTOR_TYPE(unsigned int);
 REGISTER_CUDA_VECTOR_TYPE(uint64_t);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::Subscription);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::MessageVariant);

@@ -43,6 +43,8 @@ namespace knp::backends::gpu
 CUDABackend::CUDABackend() : impl_(std::make_unique<cuda::CUDABackendImpl>(get_message_endpoint()))
 {
     SPDLOG_INFO("CUDA backend instance created.");
+    size_t new_heap = 128 * 1024 * 1024; // 128 Mb // TEMP!
+    cudaDeviceSetLimit(cudaLimitMallocHeapSize, new_heap);
 }
 
 
@@ -110,7 +112,10 @@ void CUDABackend::_step()
 {
     auto step = get_step();
     SPDLOG_DEBUG("Starting step #{}...", step);
-    if(!get_step()) impl_->get_message_bus().sync_with_host();
+    if(!get_step())
+    {
+        impl_->get_message_bus().sync_with_host();
+    }
     SPDLOG_DEBUG("Message bus 1 {}", impl_->get_message_bus().get_num_messages());
     impl_->get_message_bus().send_messages_to_host(step);
     SPDLOG_DEBUG("Message bus 2 {}", impl_->get_message_bus().get_num_messages());
@@ -308,7 +313,11 @@ REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDABackendImpl::ProjectionV
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAPopulation<knp::neuron_traits::BLIFATNeuron>);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAProjection<knp::synapse_traits::DeltaSynapse>);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAProjection<knp::synapse_traits::DeltaSynapse>::Synapse);
-REGISTER_CUDA_VECTOR_TYPE(uint64_t);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAPopulation<knp::neuron_traits::BLIFATNeuron>::NeuronParameters);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::Subscription);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::MessageVariant);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::UID);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::device_lib::CUDAVector<uint64_t>);
+REGISTER_CUDA_VECTOR_TYPE(unsigned int);
+REGISTER_CUDA_VECTOR_TYPE(uint64_t);
+

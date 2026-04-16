@@ -50,6 +50,14 @@ struct CuMallocAllocator
         T *data = nullptr;
         if (n > 0)
         {
+            size_t current_heap_size;
+            cudaError_t err = cudaDeviceGetLimit(&current_heap_size, cudaLimitMallocHeapSize);
+#ifndef __CUDA_ARCH__
+
+            SPDLOG_DEBUG("allocate: allocating {}", n * sizeof(T));
+#else
+            printf("allocate dev: allocating %lu, heap size %lu\n", n * sizeof(T), current_heap_size);
+#endif
             call_and_check(cudaMalloc(&data, n * sizeof(T)));
         }
         return data;

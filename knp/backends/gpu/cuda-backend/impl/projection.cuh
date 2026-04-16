@@ -33,7 +33,7 @@
 
 
 /**
- * @brief Namespace for single-threaded backend.
+ * @brief Namespace for CUDA backend.
  */
 namespace knp::backends::gpu::cuda
 {
@@ -59,8 +59,9 @@ struct CUDAProjection
 
     /**
      * @brief Synapse description structure that contains synapse parameters and indexes of the associated neurons.
+     * @note make sure this is the same as in core projection.
      */
-    using Synapse = ::cuda::std::tuple<SynapseParameters, uint32_t, uint32_t>;
+    using Synapse = ::cuda::std::tuple<SynapseParameters, size_t, size_t>;
 
     __host__ __device__ CUDAProjection()
     #if !defined(__CUDA_ARCH__)
@@ -78,20 +79,17 @@ struct CUDAProjection
           postsynaptic_uid_(to_gpu_uid(projection.get_postsynaptic())),
           is_locked_(projection.is_locked())
     {
-        synapses_.reserve(projection.size());
-        for (auto &synapse : projection)
-        {
-            Synapse out_synapse{std::get<0>(synapse), std::get<1>(synapse), std::get<2>(synapse)};
-            synapses_.push_back(out_synapse);
-            // TODO TEMP
-//            SPDLOG_TRACE("Synapse: weight {} delay {}", ::cuda::std::get<0>(synapses_.copy_at(0).weight_,
-//                                                                            synapses_.copy_at(0).delay_));
-            SPDLOG_TRACE("Synapse: weight {} delay {}", ::cuda::std::get<0>(out_synapse).weight_,
-                         ::cuda::std::get<0>(out_synapse).delay_);
-            Synapse syn_copy = synapses_.copy_at(synapses_.size() - 1);
-            SPDLOG_TRACE("Synapse2: weight {} delay {}", ::cuda::std::get<0>(syn_copy).weight_,
-                         ::cuda::std::get<0>(syn_copy).delay_);
-        }
+        synapses_.resize(projection.size());
+//        for (auto &synapse : projection)
+//        {
+//            Synapse out_synapse{std::get<0>(synapse), std::get<1>(synapse), std::get<2>(synapse)};
+//            synapses_.push_back(out_synapse);
+//            SPDLOG_TRACE("Synapse: weight {} delay {}", ::cuda::std::get<0>(out_synapse).weight_,
+//                         ::cuda::std::get<0>(out_synapse).delay_);
+//        }
+        cudaMemcpy(synapses_.data(), &(*projection.begin()), projection.size() * sizeof(Synapse),
+                   cudaMemcpyHostToDevice);
+
     }
 
     __host__ __device__ void lock_weights() { is_locked_ = true; }
