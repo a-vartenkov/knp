@@ -82,14 +82,14 @@ template <>
 void gpu_insert<CUDABackendImpl::ProjectionVariants>(const CUDABackendImpl::ProjectionVariants &,
                                                      CUDABackendImpl::ProjectionVariants *);
 
-//namespace detail
-//{
-//    template <class Variant, class Instance>
-//    __global__ void make_variant_kernel(Variant *result, Instance *source)
-//    {
-//        new (result) Variant(*source);
-//    }
-//}
+namespace detail
+{
+    template <class Variant, class Instance>
+    __global__ void make_variant_kernel(Variant *result, Instance *source)
+    {
+        new (result) Variant(*source);
+    }
+}
 
 
 template<class TypeVariant, size_t index>
@@ -155,9 +155,7 @@ void gpu_insert<CUDABackendImpl::ProjectionVariants>(const CUDABackendImpl::Proj
                        {
                            using ValueType = std::decay_t<decltype(val)>;
                            ValueType *buffer;
-                           SPDLOG_DEBUG("Calling cudaMalloc for {} bytes", sizeof(ValueType));
                            call_and_check(cudaMalloc(&buffer, sizeof(ValueType)));
-                           SPDLOG_DEBUG("Buffer is {}, calling gpu_insert", (void *)buffer);
                            gpu_insert(val, buffer);
                            device_lib::make_variant_kernel<<<1, 1>>>(gpu_target, buffer);
                            call_and_check(cudaFree(buffer));
@@ -328,22 +326,15 @@ void CUDABackendImpl::load_populations(const knp::backends::gpu::CUDABackend::Po
     SPDLOG_DEBUG("Loading populations [{}]...", populations.size());
 
     device_populations_.clear();
-    cudaDeviceSynchronize(); // TEMP
-    FAST_ERROR_CHECK("Cleaning populations: {}");
     device_populations_.reserve(populations.size());
-    cudaDeviceSynchronize(); // TEMP
-    FAST_ERROR_CHECK("Reserving: {}");
     for (const auto &population : populations)
     {
         ::std::visit([this](auto &arg)
         {
             using CPUPopulationType = std::decay_t<decltype(arg)>;
-            FAST_ERROR_CHECK("Before creating population: {}");
             auto pop = CUDAPopulation<typename CPUPopulationType::PopulationNeuronType>(arg);
-            FAST_ERROR_CHECK("Creating population: {}");
             device_populations_.push_back(pop);
         }, population);
-        FAST_ERROR_CHECK("Loaded a population: {}   ");
     }
 
     SPDLOG_DEBUG("All populations loaded.");
@@ -366,14 +357,14 @@ void CUDABackendImpl::load_projections(const knp::backends::gpu::CUDABackend::Pr
             using CPUProjectionType = std::decay_t<decltype(arg)>;
 
             auto proj = CUDAProjection<typename CPUProjectionType::ProjectionSynapseType>{arg};
-            SPDLOG_DEBUG("Pushing back a projection, size before: {}, pointer before: {}, capacity {}",
-                         device_projections_.size(),
-                         reinterpret_cast<void *>(device_projections_.data()),
-                         device_projections_.capacity());
-            device_projections_.push_back(std::move(proj));
-            FAST_ERROR_CHECK("Pushed back {}");
-            SPDLOG_DEBUG("Pushed back: size after: {}, pointer after: {}, capacity {}", device_projections_.size(),
-                             reinterpret_cast<void *>(device_projections_.data()), device_projections_.capacity());
+//            SPDLOG_DEBUG("Pushing back a projection, size before: {}, pointer before: {}, capacity {}",
+//                         device_projections_.size(),
+//                         reinterpret_cast<void *>(device_projections_.data()),
+//                         device_projections_.capacity());
+            device_projections_.push_back(proj);
+//            FAST_ERROR_CHECK("Pushed back {}");
+//            SPDLOG_DEBUG("Pushed back: size after: {}, pointer after: {}, capacity {}", device_projections_.size(),
+//                             reinterpret_cast<void *>(device_projections_.data()), device_projections_.capacity());
 
         }, projection);
     }
@@ -688,6 +679,7 @@ __device__ void CUDABackendImpl::calculate_projection(
 {
     constexpr size_t spike_message_index = boost::mp11::mp_find<cuda::MessageVariant, cuda::SpikeMessage>();
     PRINTF_TRACE("Messages size: %lu\n", messages.size());
+    size_t counter = 0;
     for (const knp::backends::gpu::cuda::MessageVariant &message_var : messages)
     {
         if (message_var.index() != spike_message_index) continue;
@@ -696,9 +688,9 @@ __device__ void CUDABackendImpl::calculate_projection(
         const auto &message_data = message.neuron_indexes_;
         for (size_t i = 0; i < message_data.size(); ++i)
         {
-            PRINTF_TRACE("Processing message data: index %lu, value %u\n", i, message_data[i]);
+            // PRINTF_TRACE("Processing message data: index %lu, value %u\n", i, message_data[i]);
             const auto &spiked_neuron_index = message_data[i];
-            PRINTF_TRACE("Projection size: %lu\n", projection.synapses_.size());
+            // PRINTF_TRACE("Projection size: %lu\n", projection.synapses_.size());
             for (size_t synapse_index = 0; synapse_index < projection.synapses_.size(); ++synapse_index)
             {
                 CUDAProjection<knp::synapse_traits::DeltaSynapse>::Synapse synapse =
@@ -708,22 +700,23 @@ __device__ void CUDABackendImpl::calculate_projection(
 
                 // The message is sent on step N - 1, received on step N. Step 0 delay 1 means the message is sent on 0.
                 size_t future_step = synapse_params.delay_ + step_n - 1;
-                PRINTF_TRACE("Future step: %lu, delay: %u, weight: %f\n", future_step, synapse_params.delay_,
-                       synapse_params.weight_);
+//                PRINTF_TRACE("Future step: %lu, delay: %u, weight: %f\n", future_step, synapse_params.delay_,
+//                       synapse_params.weight_);
                 knp::backends::gpu::cuda::SynapticImpact impact{
                         synapse_index, synapse_params.weight_, synapse_params.output_type_,
                         static_cast<uint32_t>(::cuda::std::get<core::source_neuron_id>(synapse)),
                         static_cast<uint32_t>(::cuda::std::get<core::target_neuron_id>(synapse))};
-                PRINTF_TRACE("Impact from neuron_%u to neuron_%u\n",
-                       impact.presynaptic_neuron_index_,
-                       impact.postsynaptic_neuron_index_);
+//                PRINTF_TRACE("Impact from neuron_%u to neuron_%u\n",
+//                       impact.presynaptic_neuron_index_,
+//                       impact.postsynaptic_neuron_index_);
+                ++counter;
                 auto iter = projection.messages_.begin();
                 // TODO: Easy to parallelize
                 for (; iter != projection.messages_.end(); ++iter)
                 {
                     if (iter->header_.send_time_ == future_step)
                     {
-                        PRINTF_TRACE("Adding impact to existing message at future_step %lu\n", future_step);
+                        // PRINTF_TRACE("Adding impact to existing message at future_step %lu\n", future_step);
                         iter->impacts_.push_back(impact);
                         break;
                     }
@@ -741,10 +734,12 @@ __device__ void CUDABackendImpl::calculate_projection(
                     message_out.is_forcing_ = is_forcing<cuda::CUDAProjection<synapse_traits::DeltaSynapse>>();
                     PRINTF_TRACE("Adding new_message to messages_ at step %lu\n", future_step);
                     projection.messages_.push_back(message_out);
+                    PRINTF_TRACE("Done adding message\n");
                 }
             }
         }
     }
+    PRINTF_TRACE("Added %lu impacts!\n", counter);
 }
 
 

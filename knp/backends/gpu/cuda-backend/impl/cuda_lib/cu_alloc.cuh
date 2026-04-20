@@ -56,7 +56,7 @@ struct CuMallocAllocator
 
             SPDLOG_DEBUG("allocate: allocating {}", n * sizeof(T));
 #else
-            printf("allocate dev: allocating %lu, heap size %lu\n", n * sizeof(T), current_heap_size);
+            printf("allocate dev: allocating %lu structures of size %lu\n", n, sizeof(T));
 #endif
             call_and_check(cudaMalloc(&data, n * sizeof(T)));
         }

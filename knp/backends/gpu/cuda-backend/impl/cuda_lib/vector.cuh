@@ -408,8 +408,6 @@ public:
         {
             SPDLOG_TRACE("Running copy construct kernel with {} blocks and {} threads.", num_blocks, num_threads);
             copy_construct_kernel<T><<<num_blocks, num_threads>>>(new_data, size_, data_);
-            cudaDeviceSynchronize(); // TEMP
-            FAST_ERROR_CHECK(typeid(T).name() + std::string(" Copy construct kernel: {}"));
             SPDLOG_TRACE("Running destruct kernel with {} blocks and {} threads", num_blocks, num_threads);
             destruct_kernel<T, Allocator><<<num_blocks, num_threads>>>(data_, size_);
             cudaDeviceSynchronize(); // TEMP
@@ -523,18 +521,7 @@ public:
     #ifdef __CUDA_ARCH__ // Device only:
         PRINTF_TRACE("Device vector actualize\n");
         for (size_t i = 0; i < size_; ++i)
-        {
-            if constexpr (std::is_trivially_copyable<T>::value)
-            {
-                // PRINTF_TRACE("Copying %p, iter %lu of %lu\n", source_data + i, i, size_);
-                data_[i] = source_data[i];
-            }
-            else
-            {
-                // PRINTF_TRACE("Calling new on %p, iter %lu of %lu\n", source_data + i, i, size_);
-                new (data_ + i) T(*(source_data + i));
-            }
-        }
+            new (data_ + i) T(*(source_data + i));
         PRINTF_TRACE("End device vector actualize\n");
 
     #else // Host only:
@@ -555,7 +542,7 @@ private:
         T* new_data = nullptr;
 
         // Capacity.
-        new_data = allocator_.allocate(new_capacity * sizeof(T));
+        new_data = allocator_.allocate(new_capacity);
 
         for (size_type i = 0; i < size_; ++i)
         {
