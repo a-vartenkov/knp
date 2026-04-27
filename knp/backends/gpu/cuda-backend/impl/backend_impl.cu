@@ -207,16 +207,19 @@ __global__ void calculate_populations_kernel(CUDABackendImpl::PopulationVariants
     PRINTF_TRACE("Population index: %lu\n", population.index());
 
     size_t num_messages = indices[thread_index].size();
+    PRINTF_TRACE("Num messages: %lu\n", num_messages);
     for (size_t n = 0; n < num_messages; ++n)
     {
         uint64_t message_index = indices[thread_index][n];
         if (message_index >= messages_size) continue;
-        PRINTF_TRACE("Messages size: %lu, message index: %lu\n", messages_size, message_index);
+        PRINTF_TRACE("Population messages size: %lu, message index: %lu\n", messages_size,
+                     message_index);
         new_messages.push_back(messages[message_index]);
     }
 
     auto message = ::cuda::std::visit([&new_messages, step](auto &pop)
     {
+        PRINTF_TRACE("Population messages size: %lu\n", new_messages.size());
         return CUDABackendImpl::calculate_population(pop, new_messages, step);
     }, population);
 
@@ -466,11 +469,12 @@ __device__ ::cuda::std::optional<knp::backends::gpu::cuda::SpikeMessage> CUDABac
     }
 
     // process_inputs(population, messages);
+    PRINTF_TRACE("Processing synaptic impacts for population\n");
     for (const knp::backends::gpu::cuda::MessageVariant &message_var : messages)
     {
         if (message_var.index() != spike_message_index) continue;
         const SynapticImpactMessage &message = ::cuda::std::get<SynapticImpactMessage>(message_var);
-
+        PRINTF_TRACE("Message size is %lu\n", message.impacts_.size());
         for (size_t i = 0; i < message.impacts_.size(); ++i)
         {
             const auto &impact = message.impacts_[i];
@@ -506,6 +510,8 @@ __device__ ::cuda::std::optional<knp::backends::gpu::cuda::SpikeMessage> CUDABac
                 }
             }*/
             population.neurons_[impact.postsynaptic_neuron_index_] = neuron;
+            if (neuron.potential_ > 0) PRINTF_TRACE("Neuron %u potential is %f\n", impact.postsynaptic_neuron_index_,
+                                                    static_cast<float>(neuron.potential_)); //TEMP
         }
     }
 
@@ -516,7 +522,6 @@ __device__ ::cuda::std::optional<knp::backends::gpu::cuda::SpikeMessage> CUDABac
     {
         bool spike = false;
         neuron_traits::neuron_parameters <neuron_traits::BLIFATNeuron> neuron = population.neurons_[index];
-
         if (neuron.total_blocking_period_ <= 0)
         {
             // TODO: Make it more readable, don't be afraid to use if operators.
@@ -534,68 +539,54 @@ __device__ ::cuda::std::optional<knp::backends::gpu::cuda::SpikeMessage> CUDABac
             neuron.total_blocking_period_ -= 1;
         }
 
-        // process_inputs(population, messages);
-        for (const knp::backends::gpu::cuda::MessageVariant &message_var : messages)
+        if (neuron.inhibitory_conductance_ < 1.0)
         {
-            if (message_var.index() != spike_message_index) continue;
-            const SynapticImpactMessage &message = ::cuda::std::get<SynapticImpactMessage>(message_var);
-
-            for (size_t i = 0; i < message.impacts_.size(); ++i)
-            {
-                const auto &impact = message.impacts_[i];
-                if (neuron.inhibitory_conductance_ < 1.0)
-                {
-                    neuron.potential_ -=
-                            (neuron.potential_ - neuron.reversal_inhibitory_potential_) *
-                            neuron.inhibitory_conductance_;
-                }
-                else
-                {
-                    neuron.potential_ = neuron.reversal_inhibitory_potential_;
-                }
-
-                if ((neuron.n_time_steps_since_last_firing_ > neuron.absolute_refractory_period_) &&
-                    (neuron.potential_ >= neuron.activation_threshold_ + neuron.dynamic_threshold_))
-                {
-                    // Spike.
-                    neuron.dynamic_threshold_ += neuron.threshold_increment_;
-                    neuron.postsynaptic_trace_ += neuron.postsynaptic_trace_increment_;
-
-                    neuron.potential_ = neuron.potential_reset_value_;
-                    neuron.bursting_phase_ = neuron.bursting_period_;
-                    neuron.n_time_steps_since_last_firing_ = 0;
-                    spike = true;
-                }
-
-                if (neuron.potential_ < neuron.min_potential_)
-                {
-                    neuron.potential_ = neuron.min_potential_;
-                }
-
-                if (spike)
-                {
-                    neuron_indexes.push_back(index);
-                }
-
-                population.neurons_[index] = neuron;
-            }
-
-            if (!neuron_indexes.empty())
-            {
-                cuda::SpikeMessage res_message
-                        {
-                                .header_ = {.sender_uid_ = population.uid_, step_n},
-                                .neuron_indexes_ = neuron_indexes
-                        };
-
-                // device_message_bus_.send_message(res_message);
-                return res_message;
-            }
-
-            return {};
+            neuron.potential_ -=
+                    (neuron.potential_ - neuron.reversal_inhibitory_potential_) *
+                    neuron.inhibitory_conductance_;
         }
-    }
+        else
+        {
+            neuron.potential_ = neuron.reversal_inhibitory_potential_;
+        }
 
+        if ((neuron.n_time_steps_since_last_firing_ > neuron.absolute_refractory_period_) &&
+            (neuron.potential_ >= neuron.activation_threshold_ + neuron.dynamic_threshold_))
+        {
+            // Spike.
+            neuron.dynamic_threshold_ += neuron.threshold_increment_;
+            neuron.postsynaptic_trace_ += neuron.postsynaptic_trace_increment_;
+
+            neuron.potential_ = neuron.potential_reset_value_;
+            neuron.bursting_phase_ = neuron.bursting_period_;
+            neuron.n_time_steps_since_last_firing_ = 0;
+            spike = true;
+        }
+
+        if (neuron.potential_ < neuron.min_potential_)
+        {
+            neuron.potential_ = neuron.min_potential_;
+        }
+
+        if (spike)
+        {
+            neuron_indexes.push_back(index);
+        }
+
+        population.neurons_[index] = neuron;
+    }
+    if (!neuron_indexes.empty())
+    {
+        PRINTF_TRACE("Spike vector is not empty: size %lu\n", neuron_indexes.size());
+        cuda::SpikeMessage res_message
+                {
+                        .header_ = {.sender_uid_ = population.uid_, step_n},
+                        .neuron_indexes_ = neuron_indexes
+                };
+
+        return res_message;
+    }
+    PRINTF_TRACE("Spike vector empty\n");
     return {};
 }
 
