@@ -32,7 +32,7 @@
 #include <vector>
 
 #include <knp/backends/gpu-cuda/backend.h>
-#include "../../../backends/gpu/cuda-backend/impl/backend_impl.cuh"
+#include "../../../backends/gpu/cuda-backend/impl/backend_impl_alt.cuh"
 #include "../../../backends/gpu/cuda-backend/impl/cuda_lib/register_type.cuh"
 #include "../../../backends/gpu/cuda-backend/impl/cuda_lib/vector.cuh"
 
@@ -41,7 +41,7 @@
 using Population = knp::backends::gpu::CUDABackend::PopulationVariants;
 using Projection = knp::backends::gpu::CUDABackend::ProjectionVariants;
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::MessageVariant);
-REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::device_lib::CUDAVector<uint64_t>);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::device_lib::CUDAVector<unsigned long long>);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAProjection<knp::synapse_traits::DeltaSynapse>::Synapse);
 
 

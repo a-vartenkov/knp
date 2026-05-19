@@ -19,7 +19,7 @@
  * limitations under the License.
  */
 
-#include "backend_impl.cuh"
+#include "backend_impl_alt.cuh"
 #include "cuda_lib/fast_error_check.cuh"
 #include "cuda_lib/register_all.cuh"
 
@@ -139,7 +139,7 @@ void CUDABackend::_step()
     SPDLOG_DEBUG("Message bus 8 {}", impl_->get_message_bus().get_num_messages());
     get_message_bus().route_messages();
     SPDLOG_DEBUG("Message bus 9 {}", impl_->get_message_bus().get_num_messages());
-    impl_->route_projection_messages(step);
+    // impl_->route_projection_messages(step);
     SPDLOG_DEBUG("Message bus 10 {}", impl_->get_message_bus().get_num_messages());
     SPDLOG_DEBUG("Step finished #{}.", get_step());
 
@@ -317,7 +317,7 @@ REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAPopulation<knp::neuron_t
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::Subscription);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::MessageVariant);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::UID);
-REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::device_lib::CUDAVector<uint64_t>);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::device_lib::CUDAVector<unsigned long long>);
 REGISTER_CUDA_VECTOR_TYPE(unsigned int);
-REGISTER_CUDA_VECTOR_TYPE(uint64_t);
+REGISTER_CUDA_VECTOR_TYPE(unsigned long long);
 

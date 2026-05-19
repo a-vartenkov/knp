@@ -47,6 +47,24 @@
  */
 namespace knp::backends::gpu::cuda::device_lib
 {
+/**
+ * @brief Plain Old Data structure for CUDAVector, used to pass into kernels.
+ * @tparam T Value type for CUDAVector.
+ */
+template <class T>
+struct CUDAVectorView
+{
+    const T * const data_;
+    const unsigned long long size_;
+};
+
+template <class T>
+struct CUDAVectorMutableView
+{
+    T * const data_;
+    const unsigned long long size_;
+};
+
 
 template <typename T, typename Allocator = CuMallocAllocator<T>>
 class CUDAVector
@@ -54,7 +72,7 @@ class CUDAVector
 public:
     using value_type = T;
     using allocator_type = Allocator;
-    using size_type = size_t;
+    using size_type = unsigned long long;
     using difference_type = ptrdiff_t;
     using reference = T&;
     using const_reference = const T&;
@@ -81,6 +99,16 @@ public:
                 gpu_insert(*(init_list.begin() + i), data_ + i); // TODO Parallelize
             }
         }
+    }
+
+    /**
+     * @brief construct a vector from a GPU pointer.
+     * @param data GPU pointer to N elements, N = size.
+     * @param size number of elements.
+     */
+    __host__ CUDAVector(value_type* &data, size_type size) : data_(data), size_(size), capacity_(size)
+    {
+        data = nullptr;
     }
 
     __host__ explicit CUDAVector(const std::vector<value_type> &vec) : capacity_(vec.size()), size_(vec.size())
@@ -121,7 +149,36 @@ public:
         return res;
     }
 
-    // TODO: Make a cheap move from gpu to cpu and back.
+    /**
+     * @brief Make a plain old data structure that can be sent into CUDA kernels.
+     * @return a structure consisting of size and pointer.
+     */
+    __host__ __device__ CUDAVectorView<T> view() const
+    {
+        return {data_, size_};
+    }
+
+    __host__ __device__ CUDAVectorMutableView<T> mut_view()
+    {
+        return {data_, size_};
+    }
+
+    CUDAVectorView<T> view(size_type begin, size_type end) const
+    {
+        unsigned long long size_out = 0;
+        if (end > size_) end = size_;
+        if (begin < end) size_out = end - begin;
+        return {data_ + begin, size_out};
+    }
+
+    CUDAVectorMutableView<T> mut_view(size_type begin, size_type end)
+    {
+        unsigned long long size_out = 0;
+        if (end > size_) end = size_;
+        if (begin < end) size_out = end - begin;
+        return {data_ + begin, size_out};
+    }
+
 
     __host__ __device__ explicit CUDAVector(size_type size = 0) : capacity_(size), size_(size)
     {
@@ -136,27 +193,28 @@ public:
         #endif
     }
 
-    // Copy constructor from a cpu pointer-based array.
-    __host__ __device__ CUDAVector(const value_type *vec, size_type size)
-    {
-        reserve(size);
-        size_ = size;
-        #ifdef __CUDA_ARCH__
-        for (size_type i = 0; i < size_; ++i) allocator_.construct(data_ + i, *(vec + i));
-        #else
-        if constexpr (std::is_trivially_copyable_v<value_type>)
-        {
-            call_and_check(cudaMemcpy(data_, vec, size * sizeof(value_type), cudaMemcpyHostToDevice));
-        }
-        else
-        {
-            for (size_t i = 0; i < size; ++i)
-            {
-                gpu_insert(vec[i], data_ + i); // TODO Parallelize
-            }
-        }
-        #endif
-    }
+//    // Copy constructor from a cpu pointer-based array.
+//    __host__ __device__ CUDAVector<T, Allocator> from_cpu(const value_type *vec, size_type size)
+//    {
+//        reserve(size);
+//        size_ = size;
+//        #ifdef __CUDA_ARCH__
+//        for (size_type i = 0; i < size_; ++i) allocator_.construct(data_ + i, *(vec + i));
+//        #else
+//        if constexpr (std::is_trivially_copyable_v<value_type>)
+//        {
+//            call_and_check(cudaMemcpy(data_, vec, size * sizeof(value_type), cudaMemcpyHostToDevice));
+//        }
+//        else
+//        {
+//            for (size_t i = 0; i < size; ++i)
+//            {
+//                gpu_insert(vec[i], data_ + i); // TODO Parallelize
+//            }
+//        }
+//        #endif
+//
+//    }
 
     __host__ __device__ ~CUDAVector()
     {
@@ -322,7 +380,7 @@ public:
         size_ = 0;
     }
 
-    __host__ __device__ bool set(uint64_t index, const value_type &value)
+    __host__ __device__ bool set(unsigned long long index, const value_type &value)
     {
         if (index >= size_) return false;
         #ifdef __CUDA_ARCH__

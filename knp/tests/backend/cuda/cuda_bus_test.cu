@@ -31,7 +31,7 @@
 #include <iostream>
 #include <vector>
 
-#include "../../../backends/gpu/cuda-backend/impl/backend_impl.cuh"
+#include "../../../backends/gpu/cuda-backend/impl/backend_impl_alt.cuh"
 #include "../../../backends/gpu/cuda-backend/impl/cuda_lib/extraction.cuh"
 #include "../../../backends/gpu/cuda-backend/impl/cuda_lib/register_type.cuh"
 #include "../../../backends/gpu/cuda-backend/impl/cuda_lib/safe_call.cuh"
@@ -43,7 +43,8 @@
 #include "../../../backends/gpu/cuda-backend/impl/population.cuh"
 
 
-REGISTER_CUDA_VECTOR_TYPE(uint64_t);
+REGISTER_CUDA_VECTOR_TYPE(unsigned long long);
+REGISTER_CUDA_VECTOR_TYPE(unsigned long);
 REGISTER_CUDA_VECTOR_TYPE(unsigned int);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::UID);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::Subscription);

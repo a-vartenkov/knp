@@ -124,7 +124,7 @@ public:
      * @brief Reserve bus buffer for messages.
      * @param num_messages number of messages.
      */
-    __host__ void reserve_message_buffer(uint64_t num_messages) { messages_to_route_.reserve(num_messages); }
+    __host__ void reserve_message_buffer(unsigned long long num_messages) { messages_to_route_.reserve(num_messages); }
 
     /**
      * @brief Copy host subscriptions here.
@@ -163,10 +163,9 @@ public:
     }
 
     template <class MessageType>
-    __host__ device_lib::CUDAVector<uint64_t> unload_messages(const cuda::UID &receiver_uid);
+    __host__ device_lib::CUDAVector<unsigned long long> unload_messages(const cuda::UID &receiver_uid);
 
     __host__ size_t get_num_messages() { return messages_to_route_.size(); }
-
 
 public:
     /**
@@ -228,7 +227,7 @@ private:
     __host__ size_t find_subscription(const cuda::UID &receiver, size_t type_id);
 
     template <typename MessageType>
-    __host__ __device__ ::cuda::std::vector<uint64_t> find_messages(const Subscription &subscription);
+    __host__ __device__ ::cuda::std::vector<unsigned long long> find_messages(const Subscription &subscription);
 
     /**
      * @brief Container that stores all the subscriptions for the current endpoint.

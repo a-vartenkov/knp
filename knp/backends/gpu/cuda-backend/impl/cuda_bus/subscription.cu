@@ -60,5 +60,5 @@ REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::Subscription);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::UID);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::MessageVariant);
 REGISTER_CUDA_VECTOR_TYPE(unsigned int);
-REGISTER_CUDA_VECTOR_TYPE(uint64_t);
+REGISTER_CUDA_VECTOR_TYPE(unsigned long long);
 

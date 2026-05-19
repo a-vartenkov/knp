@@ -57,14 +57,15 @@ file(GLOB_RECURSE ${PROJECT_NAME}_cuda_headers include/${${PROJECT_NAME}_PUBLIC_
 knp_add_library("${PROJECT_NAME}"
     BOTH
         impl/backend.cu
-        impl/backend_impl.cu
+        #impl/backend_impl.cu
+        impl/backend_impl_alt.cu
         impl/uid.cu
         impl/gpu_cuda_device.cu
         impl/cuda_bus/messaging.cu
         impl/cuda_bus/message_bus.cu
         impl/cuda_bus/subscription.cu
         impl/cuda_lib/kernels.cu
-        impl/cuda_lib/kernels.cu
+        impl/cuda_lib/value_index.cu
         # impl/get_network.cpp
         ${${PROJECT_NAME}_headers}
         ${${PROJECT_NAME}_cuda_headers}

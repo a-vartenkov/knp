@@ -133,38 +133,38 @@ __host__ void CUDAMessageBus::send_message_gpu_batch(const device_lib::CUDAVecto
  * @return
  */
 __global__ void find_messages_kernel(const MessageVariant *messages, size_t messages_size, Subscription *subscription,
-                              uint64_t *indices, unsigned long long *counter)
+                              unsigned long long *indices, unsigned long long *counter)
 {
-    uint64_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned long long i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= messages_size) return;
     if (subscription->is_my_message(messages[i]))
     {
-        uint64_t index = atomicAdd(counter, 1ull); // atomicAdd doesn't work with uint64_t but does with ULL.
+        unsigned long long index = atomicAdd(counter, 1ull);
         indices[index] = i;
     }
 }
 
 
 template <class MessageType>
-device_lib::CUDAVector<uint64_t> CUDAMessageBus::unload_messages(const cuda::UID &receiver_uid)
+device_lib::CUDAVector<unsigned long long> CUDAMessageBus::unload_messages(const cuda::UID &receiver_uid)
 {
     SPDLOG_DEBUG("Unloading messages from GPU message bus for receiver {}.", std::string(to_cpu_uid(receiver_uid)));
     size_t sub_index = find_subscription<MessageType>(receiver_uid);
-    if (sub_index >= subscriptions_.size()) return device_lib::CUDAVector<uint64_t>{};
-    if (!messages_to_route_.size()) return device_lib::CUDAVector<uint64_t>{};
+    if (sub_index >= subscriptions_.size()) return device_lib::CUDAVector<unsigned long long>{};
+    if (!messages_to_route_.size()) return device_lib::CUDAVector<unsigned long long>{};
     Subscription subscription = subscriptions_.copy_at(sub_index);
     constexpr size_t message_type = boost::mp11::mp_find<MessageVariant, MessageType>();
     SPDLOG_TRACE("There is an associated type-{} subscription and the bus is non-empty.", message_type);
-    if (subscription.type() != message_type) return device_lib::CUDAVector<uint64_t>{};
+    if (subscription.type() != message_type) return device_lib::CUDAVector<unsigned long long>{};
 
     auto [num_blocks, num_threads] = device_lib::get_blocks_config(messages_to_route_.size());
     unsigned long long *counter;
     const unsigned long long counter_start = 0;
     // cudaMallocManaged(&counter, 0);
-    cudaMalloc(&counter, sizeof(uint64_t));
-    cudaMemcpy(counter, &counter_start, sizeof(uint64_t), cudaMemcpyHostToDevice);
-    uint64_t *indices;
-    cudaMalloc(&indices, sizeof(uint64_t) * messages_to_route_.size());
+    cudaMalloc(&counter, sizeof(unsigned long long));
+    cudaMemcpy(counter, &counter_start, sizeof(unsigned long long), cudaMemcpyHostToDevice);
+    unsigned long long *indices;
+    cudaMalloc(&indices, sizeof(unsigned long long) * messages_to_route_.size());
     find_messages_kernel<<<num_blocks, num_threads>>>(messages_to_route_.data(), messages_to_route_.size(),
                subscriptions_.data() + sub_index, indices, counter);
     // Here we have a set of message indexes. Is that enough? I think it is.
@@ -172,7 +172,7 @@ device_lib::CUDAVector<uint64_t> CUDAMessageBus::unload_messages(const cuda::UID
     cudaMemcpy(&cpu_counter, counter, sizeof(cpu_counter), cudaMemcpyDeviceToHost);
     cudaFree(counter);
     SPDLOG_TRACE("Found {} incoming messages.", cpu_counter);
-    device_lib::CUDAVector<uint64_t> result(cpu_counter);
+    device_lib::CUDAVector<unsigned long long> result(cpu_counter);
     if (cpu_counter != 0)
     {
         auto [num_blocks_copy, num_threads_copy] = device_lib::get_blocks_config(cpu_counter);
@@ -247,7 +247,7 @@ __host__ void CUDAMessageBus::send_messages_to_host(size_t step)
 // We need to check that the messages we get from host were not previously sent there by GPU.
 __global__ void same_sender_kernel(cuda::UID uid, cuda::Subscription *subscriptions, size_t sub_size, bool *result)
 {
-    uint64_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned long long i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= sub_size) return;
     if (subscriptions[i].get_receiver_uid() == uid) *result = true;
 }
@@ -350,11 +350,11 @@ template
 __host__ bool cm::CUDAMessageBus::subscribe_both<SynapticImpactMessage>(const cm::UID&, const std::vector<cuda::UID>&);
 
 template
-__host__ cm::device_lib::CUDAVector<uint64_t> cm::CUDAMessageBus::unload_messages<SpikeMessage>(
+__host__ cm::device_lib::CUDAVector<unsigned long long> cm::CUDAMessageBus::unload_messages<SpikeMessage>(
         const cm::UID &receiver_uid);
 
 template
-__host__ cm::device_lib::CUDAVector<uint64_t> cm::CUDAMessageBus::unload_messages<SynapticImpactMessage>(
+__host__ cm::device_lib::CUDAVector<unsigned long long> cm::CUDAMessageBus::unload_messages<SynapticImpactMessage>(
         const cm::UID &receiver_uid);
 
 
@@ -366,9 +366,9 @@ BOOST_PP_SEQ_FOR_EACH(INSTANCE_MESSAGES_FUNCTIONS, "", BOOST_PP_VARIADIC_TO_SEQ(
 
 }  // namespace knp::backends::gpu::cuda
 
-REGISTER_CUDA_VECTOR_TYPE(uint64_t);
+REGISTER_CUDA_VECTOR_TYPE(unsigned long long);
 REGISTER_CUDA_VECTOR_TYPE(unsigned int);
-REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::device_lib::CUDAVector<uint64_t>);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::device_lib::CUDAVector<unsigned long long>);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::Subscription);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::MessageVariant);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::SpikeMessage);

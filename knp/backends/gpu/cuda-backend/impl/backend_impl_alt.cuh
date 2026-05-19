@@ -1,5 +1,5 @@
 /**
- * @file backend_impl.cuh
+ * @file backend_impl_alt.cuh
  * @brief Class definition for CUDA GPU backend.
  * @kaspersky_support Artiom N.
  * @date 24.02.2025
@@ -149,7 +149,7 @@ public:
      * @param cpu_bus Bus to exchange backend with external world.
      */
     __host__ explicit CUDABackendImpl(knp::core::MessageEndpoint &message_endpoint) :
-        device_message_bus_{message_endpoint} {}
+            device_message_bus_{message_endpoint} {}
 
     /**
      * @brief Destructor for  backend.
@@ -201,35 +201,35 @@ public:
      * @brief Get an iterator pointing to the first element of the projection loaded to backend.
      * @return projection iterator.
      */
-    __host__ __device__ ProjectionIterator begin_projections();
+    __host__ ProjectionIterator begin_projections();
     /**
      * @brief Get an iterator pointing to the first element of the projection loaded to backend.
      * @return constant projection iterator.
      */
-    __host__ __device__ ProjectionConstIterator begin_projections() const;
+    __host__ ProjectionConstIterator begin_projections() const;
     /**
      * @brief Get an iterator pointing to the last element of the projection.
      * @return iterator.
      */
-    __host__ __device__ ProjectionIterator end_projections();
+    __host__ ProjectionIterator end_projections();
     /**
      * @brief Get a constant iterator pointing to the last element of the projection.
      * @return iterator.
      */
-    __host__ __device__ ProjectionConstIterator end_projections() const;
+    __host__ ProjectionConstIterator end_projections() const;
 
 public:
     /**
      * @brief Remove projections with given UIDs from the backend.
      * @param uids UIDs of projections to remove.
      */
-    __host__ __device__ void remove_projections(const std::vector<knp::core::UID> &uids) {}
+    __host__ void remove_projections(const std::vector<knp::core::UID> &uids) {}
 
     /**
      * @brief Remove populations with given UIDs from the backend.
      * @param uids UIDs of populations to remove.
      */
-    __host__ __device__ void remove_populations(const std::vector<knp::core::UID> &uids) {}
+    __host__ void remove_populations(const std::vector<knp::core::UID> &uids) {}
 
 public:
     /**
@@ -254,7 +254,7 @@ public:
 
     // __host__ unsigned long long route_population_messages(unsigned long long step);
 
-    __host__ unsigned long long route_projection_messages(unsigned long long step);
+    // __host__ unsigned long long route_projection_messages(unsigned long long step);
 
 
     // [[nodiscard]] DataRanges get_network_data() const { return {}; }
@@ -267,19 +267,19 @@ public:
 public:
     /**
      * @brief Calculate population of BLIFAT neurons.
-     * @note Population will be changed during calculation.
+     * @note Population will be changed during calculation. TODO: __host__, parallelize populations
      * @param population population to calculate.
      * @return copy of a spike message if population is emitting one.
      */
     static __device__ ::cuda::std::optional<knp::backends::gpu::cuda::SpikeMessage> calculate_population(
-        CUDAPopulation<knp::neuron_traits::BLIFATNeuron> &population,
-        const knp::backends::gpu::cuda::device_lib::CUDAVector<cuda::MessageVariant> &messages,
-        unsigned long long step_n);
+            CUDAPopulation<knp::neuron_traits::BLIFATNeuron> &population,
+            const knp::backends::gpu::cuda::device_lib::CUDAVector<cuda::MessageVariant> &messages,
+            unsigned long long step_n);
 
     static __device__ ::cuda::std::optional<knp::backends::gpu::cuda::SpikeMessage> calculate_population(
-        CUDAPopulation<knp::neuron_traits::SynapticResourceSTDPBLIFATNeuron> &population,
-        knp::backends::gpu::cuda::device_lib::CUDAVector<cuda::MessageVariant> &messages,
-        unsigned long long step_n);
+            CUDAPopulation<knp::neuron_traits::SynapticResourceSTDPBLIFATNeuron> &population,
+            knp::backends::gpu::cuda::device_lib::CUDAVector<cuda::MessageVariant> &messages,
+            unsigned long long step_n);
 
 
     /**
@@ -288,20 +288,20 @@ public:
      * @param projection projection to calculate.
      * @param message_queue message queue to send to projection for calculation.
      */
-    static __device__ void calculate_projection(
-        CUDAProjection<knp::synapse_traits::DeltaSynapse> &projection,
-        const knp::backends::gpu::cuda::device_lib::CUDAVector<cuda::MessageVariant> &messages,
-        unsigned long long step_n);
+    __host__ void calculate_projection(
+            CUDAProjection<knp::synapse_traits::DeltaSynapse> &projection,
+            const knp::backends::gpu::cuda::device_lib::CUDAVector<unsigned long long> &message_ids,
+            unsigned long long step_n);
 
-    static __device__ void calculate_projection(
-        CUDAProjection<knp::synapse_traits::AdditiveSTDPDeltaSynapse> &projection,
-        const knp::backends::gpu::cuda::device_lib::CUDAVector<cuda::MessageVariant> &messages,
-        unsigned long long step_n);
+    __host__ void calculate_projection(
+            CUDAProjection<knp::synapse_traits::AdditiveSTDPDeltaSynapse> &projection,
+            const knp::backends::gpu::cuda::device_lib::CUDAVector<unsigned long long> &message_ids,
+            unsigned long long step_n);
 
-    static __device__ void calculate_projection(
-        CUDAProjection<knp::synapse_traits::SynapticResourceSTDPDeltaSynapse> &projection,
-        const knp::backends::gpu::cuda::device_lib::CUDAVector<cuda::MessageVariant> &messages,
-        unsigned long long step_n);
+    __host__ void calculate_projection(
+            CUDAProjection<knp::synapse_traits::SynapticResourceSTDPDeltaSynapse> &projection,
+            const knp::backends::gpu::cuda::device_lib::CUDAVector<unsigned long long> &message_ids,
+            unsigned long long step_n);
 
     void init();
 
@@ -330,4 +330,4 @@ template <>
 void gpu_insert<CUDABackendImpl::ProjectionVariants>(const CUDABackendImpl::ProjectionVariants &cpu_source,
                                                      CUDABackendImpl::ProjectionVariants *gpu_target);
 
-}  // namespace knp::backends::gpu::cuda
+}   // namespace knp::backends::gpu::cuda

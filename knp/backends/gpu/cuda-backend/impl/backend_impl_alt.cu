@@ -34,7 +34,7 @@
 
 #include <algorithm>
 
-#include "backend_impl.cuh"
+#include "backend_impl_alt.cuh"
 #include "projection.cuh"
 #include "population.cuh"
 
@@ -44,6 +44,8 @@
 #include "cuda_lib/register_all.cuh"
 #include "cuda_lib/vector.cuh"
 #include "cuda_bus/messaging.cuh"
+#include <thrust/binary_search.h>
+#include <thrust/sort.h>
 
 
 namespace knp::backends::gpu::cuda
@@ -68,7 +70,7 @@ __host__ __device__ inline bool is_forcing()
 
 template <>
 CUDABackendImpl::PopulationVariants gpu_extract<CUDABackendImpl::PopulationVariants>(
-    const CUDABackendImpl::PopulationVariants *);
+        const CUDABackendImpl::PopulationVariants *);
 
 template <>
 void gpu_insert<CUDABackendImpl::PopulationVariants>(const CUDABackendImpl::PopulationVariants &,
@@ -192,6 +194,22 @@ device_lib::CUDAVector<cuda::UID> get_uids(const device_lib::CUDAVector<VectorDa
 }
 
 
+template<class VectorData>
+device_lib::CUDAVector<cuda::UID> get_uids_std(const std::vector<VectorData> &entities)
+{
+    device_lib::CUDAVector<cuda::UID> result;
+    result.reserve(entities.size());
+    for (size_t i = 0; i < entities.size(); ++i)
+    {
+        ::cuda::std::visit([&result](const auto &entity)
+                   {
+                       result.push_back(entity.uid_);
+                   }, entities[i]);
+    }
+    return result;
+}
+
+
 /// @note: out_messages_data should be of size to contain at least num_populations messages.
 __global__ void calculate_populations_kernel(CUDABackendImpl::PopulationVariants *populations, size_t num_populations,
                                              const cuda::MessageVariant *messages, size_t messages_size,
@@ -219,10 +237,10 @@ __global__ void calculate_populations_kernel(CUDABackendImpl::PopulationVariants
     }
 
     auto message = ::cuda::std::visit([&new_messages, step](auto &pop)
-    {
-        PRINTF_TRACE("Population messages size: %lu\n", new_messages.size());
-        return CUDABackendImpl::calculate_population(pop, new_messages, step);
-    }, population);
+                                      {
+                                          PRINTF_TRACE("Population messages size: %lu\n", new_messages.size());
+                                          return CUDABackendImpl::calculate_population(pop, new_messages, step);
+                                      }, population);
 
     if (message) out_messages_data[thread_index] = cuda::MessageVariant{message.value()};
 }
@@ -241,8 +259,9 @@ void CUDABackendImpl::calculate_populations(unsigned long long step)
 
     for (size_t i = 0; i < device_populations_.size(); ++i)
     {
-        const device_lib::CUDAVector<unsigned long long> message_ids
-                = device_message_bus_.unload_messages<SynapticImpactMessage>(population_uids.copy_at(i));
+        const device_lib::CUDAVector<unsigned long long> message_ids =
+                device_message_bus_.unload_messages<SynapticImpactMessage>(
+                    population_uids.copy_at(i));
         gpu_insert(message_ids, population_messages.data() + i);
     }
 
@@ -258,46 +277,6 @@ void CUDABackendImpl::calculate_populations(unsigned long long step)
 }
 
 
-/**
- * Calculate a step for all projections in a network.
- * @param projections vector of projection variants.
- * @param num_projections number of projections.
- * @param messages a vector of all messages in the GPU bus.
- * @param messages_size number of all messages in the GPU bus.
- * @param indices indices of messages directed at each projection.
- * @param step current network step.
- * @note make sure number of valid indices is equal to num_projections.
- */
-__global__ void
-calculate_projections_kernel(CUDABackendImpl::ProjectionVariants *projections, size_t num_projections,
-                             const cuda::MessageVariant *messages, size_t messages_size,
-                             const cuda::device_lib::CUDAVector<unsigned long long> *indices,
-                             unsigned long long step)
-{
-    // Calculate projections.
-    // using namespace ::cuda::std::placeholders;
-    PRINTF_TRACE("prjs: %lu %p\n msgs: %lu %p\n inds: %p\n", num_projections, projections, messages_size, messages,
-           indices);
-    size_t thread_index = blockIdx.x * blockDim.x + threadIdx.x;
-    if (thread_index >= num_projections) return;
-
-    CUDABackendImpl::ProjectionVariants &projection = projections[thread_index];
-    knp::backends::gpu::cuda::device_lib::CUDAVector<cuda::MessageVariant> msgs; // (indices[thread_index].size());
-    for (size_t n = 0; n < indices[thread_index].size(); ++n)  // Almost always 1 or 0 iterations.
-    {
-        unsigned long long message_index = indices[thread_index][n];
-        if (message_index >= messages_size) continue;
-        PRINTF_TRACE("size %lu message_index %lu, n %lu\n", msgs.size(), message_index, n);
-        msgs.push_back(messages[message_index]);
-        PRINTF_TRACE("Msgs after adding: %lu\n", msgs.size());
-    }
-    ::cuda::std::visit([&msgs, step](auto &proj)
-    {
-        CUDABackendImpl::calculate_projection(proj, msgs, step);
-    }, projection);
-}
-
-
 void CUDABackendImpl::calculate_projections(unsigned long long step)
 {
     // Calculate projections.
@@ -305,22 +284,22 @@ void CUDABackendImpl::calculate_projections(unsigned long long step)
 
     if (!device_projections_.size()) return;
 
-    device_lib::CUDAVector<device_lib::CUDAVector<unsigned long long>> projection_messages(device_projections_.size());
+    std::vector<device_lib::CUDAVector<unsigned long long>> projection_messages(device_projections_.size());
     for (size_t i = 0; i < device_projections_.size(); ++i)
     {
         const device_lib::CUDAVector<unsigned long long> message_ids
-                = device_message_bus_.unload_messages<SpikeMessage>(projection_uids.copy_at(i));
-        gpu_insert(message_ids, projection_messages.data() + i);
+            = device_message_bus_.unload_messages<cuda::SpikeMessage>(projection_uids.copy_at(i));
+        projection_messages.push_back(message_ids);
     }
 
-    auto [num_blocks, num_threads] = device_lib::get_blocks_config(device_projections_.size());
     assert(device_projections_.size() == projection_messages.size());
-    calculate_projections_kernel<<<num_blocks, num_threads>>>(device_projections_.data(),
-                                                              device_projections_.size(),
-                                                              device_message_bus_.all_messages().data(),
-                                                              device_message_bus_.all_messages().size(),
-                                                              projection_messages.data(),
-                                                              step);
+    for (size_t i = 0; i < device_projections_.size(); ++i)
+    {
+        ::cuda::std::visit([this, &projection_messages, step, i](auto &projection)
+        {
+            calculate_projection(projection, projection_messages[i], step);
+        }, device_projections_[i]);
+    }
     cudaDeviceSynchronize();
 }
 
@@ -334,11 +313,11 @@ void CUDABackendImpl::load_populations(const knp::backends::gpu::CUDABackend::Po
     for (const auto &population : populations)
     {
         ::std::visit([this](auto &arg)
-        {
-            using CPUPopulationType = std::decay_t<decltype(arg)>;
-            auto pop = CUDAPopulation<typename CPUPopulationType::PopulationNeuronType>(arg);
-            device_populations_.push_back(pop);
-        }, population);
+                     {
+                         using CPUPopulationType = std::decay_t<decltype(arg)>;
+                         auto pop = CUDAPopulation<typename CPUPopulationType::PopulationNeuronType>(arg);
+                         device_populations_.push_back(pop);
+                     }, population);
     }
 
     SPDLOG_DEBUG("All populations loaded.");
@@ -357,20 +336,20 @@ void CUDABackendImpl::load_projections(const knp::backends::gpu::CUDABackend::Pr
     for (const auto &projection : projections)
     {
         ::std::visit([this](auto &arg)
-        {
-            using CPUProjectionType = std::decay_t<decltype(arg)>;
+                     {
+                         using CPUProjectionType = std::decay_t<decltype(arg)>;
 
-            auto proj = CUDAProjection<typename CPUProjectionType::ProjectionSynapseType>{arg};
+                         auto proj = CUDAProjection<typename CPUProjectionType::ProjectionSynapseType>{arg};
 //            SPDLOG_DEBUG("Pushing back a projection, size before: {}, pointer before: {}, capacity {}",
 //                         device_projections_.size(),
 //                         reinterpret_cast<void *>(device_projections_.data()),
 //                         device_projections_.capacity());
-            device_projections_.push_back(proj);
+                         device_projections_.push_back(proj);
 //            FAST_ERROR_CHECK("Pushed back {}");
 //            SPDLOG_DEBUG("Pushed back: size after: {}, pointer after: {}, capacity {}", device_projections_.size(),
 //                             reinterpret_cast<void *>(device_projections_.data()), device_projections_.capacity());
 
-        }, projection);
+                     }, projection);
     }
 
     SPDLOG_DEBUG("All projections loaded.");
@@ -383,11 +362,11 @@ __global__ void get_projection_uids_kernel(const CUDABackendImpl::ProjectionVari
                                            cuda::UID *self_uid)
 {
     ::cuda::std::visit([pre_uid, post_uid, self_uid](const auto &proj)
-        {
-            *pre_uid = proj.presynaptic_uid_;
-            *post_uid = proj.postsynaptic_uid_;
-            *self_uid = proj.uid_;
-        }, *projection);
+                       {
+                           *pre_uid = proj.presynaptic_uid_;
+                           *post_uid = proj.postsynaptic_uid_;
+                           *self_uid = proj.uid_;
+                       }, *projection);
 }
 
 
@@ -432,12 +411,12 @@ void CUDABackendImpl::init()
 
 
 __device__ ::cuda::std::optional<knp::backends::gpu::cuda::SpikeMessage> CUDABackendImpl::calculate_population(
-    CUDAPopulation<knp::neuron_traits::BLIFATNeuron> &population,
-    const knp::backends::gpu::cuda::device_lib::CUDAVector<cuda::MessageVariant> &messages,
-    unsigned long long step_n)
+        CUDAPopulation<knp::neuron_traits::BLIFATNeuron> &population,
+        const knp::backends::gpu::cuda::device_lib::CUDAVector<cuda::MessageVariant> &messages,
+        unsigned long long step_n)
 {
     constexpr size_t spike_message_index =
-        boost::mp11::mp_find<cuda::MessageVariant, cuda::SynapticImpactMessage>();
+            boost::mp11::mp_find<cuda::MessageVariant, cuda::SynapticImpactMessage>();
 
     // TODO rework
     for (size_t i = 0; i < population.neurons_.size(); ++i)
@@ -592,215 +571,37 @@ __device__ ::cuda::std::optional<knp::backends::gpu::cuda::SpikeMessage> CUDABac
 }
 
 
-__device__ int64_t find_projection_messages(const CUDABackendImpl::ProjectionVariants *projection, unsigned long long step)
-{
-    auto res = ::cuda::std::visit([step](const auto &proj) -> unsigned long long
-    {
-        // TODO Parallelize
-        for (unsigned long long i = 0; i < proj.messages_.size(); ++i)
-        {
-            if (proj.messages_[i].header_.send_time_ == step) return i;  //! future_step?
-        }
+//__host__ unsigned long long CUDABackendImpl::route_projection_messages(unsigned long long step)
+//{
+//    using MessageVector = device_lib::CUDAVector<cuda::MessageVariant>;
+//    MessageVector *messages;
+//    device_message_bus_.clear();
+//
+//    for (size_t i = 0; i < device_projections_.size(); ++i)
+//    {
+//        call_and_check(cudaMalloc(&messages, sizeof(MessageVector)));
+//        extract_projection_message<<<1, 1>>>(device_projections_.data() + i, step, messages);
+//        cudaDeviceSynchronize();
+//        MessageVector msg_vec = gpu_extract<MessageVector>(messages);
+//        device_message_bus_.send_message_gpu_batch(msg_vec);
+//    }
+//    return 0;
+//}
 
-        return static_cast<unsigned long long>(0u);
-    }, *projection);
-
-    return res;
-}
-
-
-/**
- * @brief Extracts projection messages to a buffer vector.
- * @param projection target projection.
- * @param step current step.
- * @param messages_out message buffer pointer, should be a vector
- */
-__global__ void extract_projection_message(CUDABackendImpl::ProjectionVariants *projection, unsigned long long step,
-                                           device_lib::CUDAVector<MessageVariant> *messages_out)
-{
-    new (messages_out) device_lib::CUDAVector<MessageVariant>(0);
-    ::cuda::std::visit([messages_out, step](auto &proj)
-        {
-            if (proj.messages_.size() == 0) return;
-            for (unsigned long long i = proj.messages_.size(); i-- > 0; )
-            {
-                if (proj.messages_[i].header_.send_time_ == step)
-                {
-                    // Sending message
-                    messages_out->push_back(::cuda::std::move(proj.messages_[i]));
-                    auto iter = proj.messages_.data() + i;
-                    proj.messages_.erase(iter, iter + 1);
-                }
-            }
-        }, *projection);
-}
-
-
-
-
-/*
- * Расчёт проекций
- * Нужен индекс нейронов: для каждого нейрона пресинаптической нужен вектор синапсов. Просуммировав их можно получить
- * общее количество воздействий.
- * Создаём вектор воздействий нужного размера. Возможно даже не воздействий, а синапсов.
- * Сортируем их по времени отправления. Для каждой группы создаём сообщение и добавляем в очередь, желательно мувом.
- *
- */
-__device__ void CUDABackendImpl::calculate_projection(
-    CUDAProjection<knp::synapse_traits::DeltaSynapse> &projection,
-    const knp::backends::gpu::cuda::device_lib::CUDAVector<cuda::MessageVariant> &messages,
-    unsigned long long step_n)
-{
-    constexpr size_t spike_message_index = boost::mp11::mp_find<cuda::MessageVariant, cuda::SpikeMessage>();
-    PRINTF_TRACE("Messages size: %lu\n", messages.size());
-    size_t counter = 0;
-    for (const knp::backends::gpu::cuda::MessageVariant &message_var : messages)
-    {
-        if (message_var.index() != spike_message_index) continue;
-        const SpikeMessage &message = ::cuda::std::get<SpikeMessage>(message_var);
-        PRINTF_TRACE("Processing message\n");
-        const auto &message_data = message.neuron_indexes_;
-
-        // 1. For each neuron count the corresponding synapses and allocate a buffer of the required size,
-        // possibly on host.
-
-
-        // 2. For each active synapse calculate its impact.
-
-        // 3. Sort impacts by time, make messages.
-
-
-        for (size_t i = 0; i < message_data.size(); ++i)
-        {
-            // PRINTF_TRACE("Processing message data: index %lu, value %u\n", i, message_data[i]);
-            const auto &spiked_neuron_index = message_data[i];
-            // PRINTF_TRACE("Projection size: %lu\n", projection.synapses_.size());
-            for (size_t synapse_index = 0; synapse_index < projection.synapses_.size(); ++synapse_index)
-            {
-                CUDAProjection<knp::synapse_traits::DeltaSynapse>::Synapse synapse =
-                        projection.synapses_[synapse_index];
-                if (::cuda::std::get<core::source_neuron_id>(synapse) != spiked_neuron_index) continue;
-                const auto &synapse_params = ::cuda::std::get<core::synapse_data>(synapse);
-
-                // The message is sent on step N - 1, received on step N. Step 0 delay 1 means the message is sent on 0.
-                size_t future_step = synapse_params.delay_ + step_n - 1;
-//                PRINTF_TRACE("Future step: %lu, delay: %u, weight: %f\n", future_step, synapse_params.delay_,
-//                       synapse_params.weight_);
-                knp::backends::gpu::cuda::SynapticImpact impact{
-                        synapse_index, synapse_params.weight_, synapse_params.output_type_,
-                        static_cast<uint32_t>(::cuda::std::get<core::source_neuron_id>(synapse)),
-                        static_cast<uint32_t>(::cuda::std::get<core::target_neuron_id>(synapse))};
-
-                auto iter = projection.messages_.begin();
-                // TODO: Easy to parallelize
-                for (; iter != projection.messages_.end(); ++iter)
-                {
-                    if (iter->header_.send_time_ == future_step)
-                    {
-                        // PRINTF_TRACE("Adding impact to existing message at future_step %lu\n", future_step);
-                        iter->impacts_.push_back(impact);
-                        break;
-                    }
-                }
-                if (iter == projection.messages_.end())
-                {
-                    device_lib::CUDAVector<cuda::SynapticImpact> impacts(1);
-                    impacts[0] = impact;
-                    cuda::SynapticImpactMessage message_out{
-                            {projection.uid_, future_step},
-                            projection.presynaptic_uid_,
-                            projection.postsynaptic_uid_,
-                            ::cuda::std::move(impacts)};
-
-                    message_out.is_forcing_ = is_forcing<cuda::CUDAProjection<synapse_traits::DeltaSynapse>>();
-                    PRINTF_TRACE("Adding new_message to messages_ at step %lu\n", future_step);
-                    projection.messages_.push_back(message_out);
-                    PRINTF_TRACE("Done adding message\n");
-                }
-            }
-        }
-    }
-}
-
-
-__device__ void CUDABackendImpl::calculate_projection(
-    CUDAProjection<knp::synapse_traits::AdditiveSTDPDeltaSynapse> &projection,
-    const knp::backends::gpu::cuda::device_lib::CUDAVector<cuda::MessageVariant> &messages,
-    unsigned long long step_n)
+__host__ void CUDABackendImpl::calculate_projection(
+        CUDAProjection<knp::synapse_traits::AdditiveSTDPDeltaSynapse> &projection,
+        const knp::backends::gpu::cuda::device_lib::CUDAVector<unsigned long long> &message_ids,
+        unsigned long long step_n)
 {
     //SPDLOG_TRACE("Calculate AdditiveSTDPDelta synapse projection {}.", std::string(projection.get_uid()));
 }
 
 
-__device__ void CUDABackendImpl::calculate_projection(
-    CUDAProjection<knp::synapse_traits::SynapticResourceSTDPDeltaSynapse> &projection,
-    const knp::backends::gpu::cuda::device_lib::CUDAVector<cuda::MessageVariant> &messages,
-    unsigned long long step_n)
+__host__ void CUDABackendImpl::calculate_projection(
+        CUDAProjection<knp::synapse_traits::SynapticResourceSTDPDeltaSynapse> &projection,
+        const knp::backends::gpu::cuda::device_lib::CUDAVector<unsigned long long> &message_ids,
+        unsigned long long step_n)
 {
-//    SPDLOG_TRACE("Calculate STDPSynapticResource synapse projection {}.", std::string(projection.get_uid()));
-    // WeightUpdateSTDP<SynapseType>::init_synapse(std::get<core::synapse_data>(synapse), step_n);
-    // Run:
-    // knp::backends::cpu::calculate_delta_synapse_projection(
-    //    projection, get_message_endpoint(), message_queue, get_step());
-
-
-    // message_bus_.unload_messages<cuda::SpikeMessage>(projection.uid_, messages);
-
-    // auto out_iter = calculate_delta_synapse_projection_data(projection, messages, future_messages, get_step());
-    //
-    // using SynapseType = typename ProjectionType::ProjectionSynapseType;
-    // WeightUpdateSTDP<SynapseType>::init_projection(projection, messages, step_n);
-
-                // WeightUpdateSTDP<SynapseType>::init_synapse(std::get<core::synapse_data>(synapse), step_n);
-//                const auto &synapse_params = thrust::get<core::synapse_data>(synapse);
-/*                const auto &synapse_params = thrust::get<core::synapse_data>(synapse);
-
-                // The message is sent on step N - 1, received on step N.
-                size_t future_step = synapse_params.delay_ + step_n - 1;
-                knp::backends::gpu::cuda::SynapticImpact impact{
-                    synapse_index, synapse_params.weight_, synapse_params.output_type_,
-                    static_cast<uint32_t>(thrust::get<core::source_neuron_id>(synapse)),
-                    static_cast<uint32_t>(thrust::get<core::target_neuron_id>(synapse))};
-
-                // ::cuda::std::find_if() is not implemented yet.
-                auto iter = projection.messages_.begin();
-                for (; iter != projection.messages_.end(); ++iter)
-                {
-                    if (iter->first == future_step) break;
-                }
-
-                if (iter != projection.messages_.end())
-                {
-                    iter->second.impacts_.push_back(impact);
-                }
-                else
-                {
-/*                    cuda::SynapticImpactMessage message_out{
-                        {projection.uid_, step_n},
-                        projection.presynaptic_uid_,
-                        projection.postsynaptic_uid_,
-                        is_forcing<cuda::CUDAProjection<synapse_traits::DeltaSynapse>>(),
-                        {impact}};
-
-                    projection.messages_.push_back(message_out));
-*/
-//                }
-//            }
-//        }
-//    }
-
-/*
-    // WeightUpdateSTDP<SynapseType>::modify_weights(projection);
-    return future_messages.find(step_n);
-    //
-
-    if (out_iter != future_messages.end())
-    {
-        // Send a message and remove it from the queue.
-        message_bus_.send_message(out_iter->second);
-        future_messages.erase(out_iter);
-    }
-*/
 }
 
 
@@ -828,30 +629,171 @@ __host__ __device__ CUDABackendImpl::PopulationConstIterator CUDABackendImpl::en
 }
 
 
-__host__ __device__ CUDABackendImpl::ProjectionIterator CUDABackendImpl::begin_projections()
+__host__ CUDABackendImpl::ProjectionIterator CUDABackendImpl::begin_projections()
 {
     return ProjectionIterator{device_projections_.begin()};
 }
 
 
-__host__ __device__ CUDABackendImpl::ProjectionConstIterator CUDABackendImpl::begin_projections() const
+__host__ CUDABackendImpl::ProjectionConstIterator CUDABackendImpl::begin_projections() const
 {
     return device_projections_.cbegin();
 }
 
 
-__host__ __device__ CUDABackendImpl::ProjectionIterator CUDABackendImpl::end_projections()
+__host__ CUDABackendImpl::ProjectionIterator CUDABackendImpl::end_projections()
 {
     return ProjectionIterator{device_projections_.end()};
 }
 
 
-__host__ __device__ CUDABackendImpl::ProjectionConstIterator CUDABackendImpl::end_projections() const
+__host__ CUDABackendImpl::ProjectionConstIterator CUDABackendImpl::end_projections() const
 {
     return device_projections_.cend();
 }
 
-}  // namespace knp::backends::gpu::cuda
+
+// TODO : Maybe move to delta synapse implementation:
+__global__ void calculate_synaptic_impact(
+        const device_lib::CUDAVectorView<CUDAProjection<knp::synapse_traits::DeltaSynapse>::Synapse> synapses,
+        const unsigned long long *synapse_indices, size_t size, unsigned long long current_step,
+        unsigned long long *results, unsigned long long *send_steps)
+{
+    size_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= size) return;
+    unsigned long long synapse_id = synapse_indices[i];
+    if (synapse_id >= synapses.size_) return;
+    results[i] = synapse_id;
+    send_steps[i] = ::cuda::std::get<0>(synapses.data_[synapse_id]).delay_ + current_step - 1;
+}
+
+
+__global__ void calculate_impacts_per_spike(
+        const device_lib::CUDAVectorView<CUDAProjection<knp::synapse_traits::DeltaSynapse>::Synapse> synapses,
+        device_lib::CUDAVectorView<SpikeIndex> spike_ids, device_lib::IndexView index,
+        unsigned long long current_step, unsigned long long *results, unsigned long long *send_steps)
+{
+    size_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i >= spike_ids.size_) return;
+    auto neuron_id = spike_ids.data_[i];
+    unsigned long long start = index.offsets_ptr_[neuron_id];
+    auto size = index.offsets_ptr_[neuron_id + 1] - index.offsets_ptr_[neuron_id];
+    auto [num_blocks, num_threads] = device_lib::get_blocks_config(size);
+    calculate_synaptic_impact<<<num_blocks, num_threads>>>(synapses, index.indices_ptr_ + start, size, current_step,
+                                                           results + start, send_steps + start);
+}
+
+
+__global__ void delta_indices_to_impacts_kernel(unsigned long long *indices_begin, unsigned long long *indices_end,
+                cuda::device_lib::CUDAVectorView<CUDAProjection<knp::synapse_traits::DeltaSynapse>::Synapse> synapses,
+                SynapticImpact *impacts_out)
+{
+    size_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned long long *index = indices_begin + i;
+    if (index >= indices_end) return;
+    unsigned long long synapse_id = *index;
+    if (synapse_id > synapses.size_) return;
+    auto &synapse = ::cuda::std::get<0>(synapses.data_[synapse_id]);
+    SynapticImpact impact_out;
+    impact_out.connection_index_ = synapse_id;
+    impact_out.impact_value_ = synapse.weight_;
+    impact_out.synapse_type_ = synapse.output_type_;
+    impact_out.presynaptic_neuron_index_ = ::cuda::std::get<1>(synapses.data_[synapse_id]);
+    impact_out.postsynaptic_neuron_index_ = ::cuda::std::get<2>(synapses.data_[synapse_id]);
+    impacts_out[synapse_id] = impact_out;
+}
+
+
+template<>
+std::optional<cuda::SynapticImpactMessage> CUDAProjection<knp::synapse_traits::DeltaSynapse>::form_message(
+        unsigned long long current_step)
+{
+    auto iter = thrust::upper_bound(sending_steps_.begin(), sending_steps_.end(), current_step);
+    if (iter == sending_steps_.begin()) return {};
+    unsigned long long num_impacts = iter - sending_steps_.begin();
+    SynapticImpact *impacts;
+    auto [num_blocks, num_threads] = device_lib::get_blocks_config(num_impacts);
+    call_and_check(cudaMalloc(&impacts, sizeof(SynapticImpact) * num_impacts));
+    delta_indices_to_impacts_kernel<<<num_blocks, num_threads>>>(impact_indexes_.data(),
+                                                                impact_indexes_.data() + num_impacts, synapses_.view(),
+                                                                impacts);
+    MessageHeader header{uid_, current_step};
+    SynapticImpactMessage result{header, presynaptic_uid_, postsynaptic_uid_,
+                                 device_lib::CUDAVector<SynapticImpact>{impacts, num_impacts}, true};
+    sending_steps_.erase(sending_steps_.begin(), sending_steps_.begin() + num_impacts);
+    impact_indexes_.erase(impact_indexes_.begin(), impact_indexes_.begin() + num_impacts);
+    return result;
+}
+
+
+__global__ void get_spike_message_data(device_lib::CUDAVectorView<cuda::MessageVariant> all_messages,
+                    unsigned long long msg_index, unsigned long long *size, const SpikeIndex **data_pointer)
+{
+    if (msg_index >= all_messages.size_ || all_messages.data_[msg_index].index())
+    {
+        *data_pointer = nullptr;
+        return;
+    }
+    constexpr size_t spike_message_index = boost::mp11::mp_find<cuda::MessageVariant, cuda::SpikeMessage>();
+    auto &message_var = all_messages.data_[msg_index];
+    if (message_var.index() != spike_message_index)
+    *data_pointer = ::cuda::std::get<cuda::SpikeMessage>(message_var).neuron_indexes_.data();
+}
+
+
+/**
+ * @brief Calculate delta projection, host gpu-using variant.
+*/
+__host__ void CUDABackendImpl::calculate_projection(
+        CUDAProjection<knp::synapse_traits::DeltaSynapse> &projection,
+        const device_lib::CUDAVector<unsigned long long> &message_ids,
+        unsigned long long step_n)
+{
+    for (size_t i = 0; i < message_ids.size(); ++i)
+    {
+        unsigned long long msg_index = message_ids.copy_at(i);
+
+        // 1. For each neuron count the corresponding synapses and allocate a buffer of the required size,
+        // possibly on host.
+        // Extracting message data pointer and size.
+        const SpikeIndex **msg_data_pointer;
+        unsigned long long *msg_data_size;
+        call_and_check(cudaMalloc(&msg_data_pointer, sizeof(void *)));
+        call_and_check(cudaMalloc(&msg_data_size, sizeof(unsigned long long)));
+
+        get_spike_message_data<<<1, 1>>>(device_message_bus_.all_messages().view(), msg_index, msg_data_size,
+                                         msg_data_pointer);
+        unsigned long long data_size;
+        cudaMemcpy(&data_size, msg_data_size, sizeof(unsigned long long), cudaMemcpyDeviceToHost);
+        cudaFree(msg_data_size);
+
+        unsigned long long impacts_count = count_values_by_indexes(projection.index_,
+                                       device_lib::CUDAVectorView<SpikeIndex>{*msg_data_pointer, data_size});
+
+        unsigned long long *impacts_buffer;
+        unsigned long long *delay_buffer;
+        call_and_check(cudaMalloc(&impacts_buffer, sizeof(unsigned long long) * impacts_count));
+        call_and_check(cudaMalloc(&delay_buffer, sizeof(unsigned long long) * impacts_count));
+
+        // 2. For each active synapse calculate its impact.
+        auto [num_blocks, num_threads] = device_lib::get_blocks_config(data_size);
+        calculate_impacts_per_spike<<<num_blocks, num_threads>>>(projection.synapses_.view(),
+                     device_lib::CUDAVectorView<SpikeIndex>{*msg_data_pointer, data_size},
+                     projection.index_.view(), step_n, impacts_buffer, delay_buffer);
+        cudaDeviceSynchronize();
+        // 3. Sort impacts by time, make messages.
+        thrust::sort_by_key(delay_buffer, delay_buffer + impacts_count, impacts_buffer);
+        projection.add_impacts(device_lib::CUDAVector<unsigned long long>{impacts_buffer, impacts_count},
+                               device_lib::CUDAVector<unsigned long long>{delay_buffer, impacts_count});
+        auto message = projection.form_message(step_n);
+        if (message.has_value())
+            device_message_bus_.send_message(message.value());
+
+        cudaFree(msg_data_pointer);
+    }
+}
+
+}   // namespace knp::backends::gpu::cuda
 
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDABackendImpl::PopulationVariants);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDABackendImpl::ProjectionVariants);

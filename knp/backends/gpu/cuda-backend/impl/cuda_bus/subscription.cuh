@@ -132,7 +132,7 @@ public:
      */
     __device__ __host__ bool remove_sender(const cuda::UID &uid)
     {
-        for (uint64_t index = 0; index < senders_.size(); ++index)
+        for (unsigned long long index = 0; index < senders_.size(); ++index)
         {
             if (senders_.copy_at(index) == uid)
             {
