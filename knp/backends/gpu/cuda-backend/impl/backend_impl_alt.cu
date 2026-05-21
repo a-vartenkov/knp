@@ -340,14 +340,14 @@ void CUDABackendImpl::load_projections(const knp::backends::gpu::CUDABackend::Pr
                          using CPUProjectionType = std::decay_t<decltype(arg)>;
 
                          auto proj = CUDAProjection<typename CPUProjectionType::ProjectionSynapseType>{arg};
-//            SPDLOG_DEBUG("Pushing back a projection, size before: {}, pointer before: {}, capacity {}",
-//                         device_projections_.size(),
-//                         reinterpret_cast<void *>(device_projections_.data()),
-//                         device_projections_.capacity());
+            SPDLOG_DEBUG("Pushing back a projection, size before: {}, pointer before: {}, capacity {}",
+                         device_projections_.size(),
+                         reinterpret_cast<void *>(device_projections_.data()),
+                         device_projections_.capacity());
                          device_projections_.push_back(proj);
-//            FAST_ERROR_CHECK("Pushed back {}");
-//            SPDLOG_DEBUG("Pushed back: size after: {}, pointer after: {}, capacity {}", device_projections_.size(),
-//                             reinterpret_cast<void *>(device_projections_.data()), device_projections_.capacity());
+            FAST_ERROR_CHECK("Pushed back {}");
+            SPDLOG_DEBUG("Pushed back: size after: {}, pointer after: {}, capacity {}", device_projections_.size(),
+                             reinterpret_cast<void *>(device_projections_.data()), device_projections_.capacity());
 
                      }, projection);
     }
@@ -395,10 +395,12 @@ void CUDABackendImpl::init()
     SPDLOG_DEBUG("Initializing CUDABackendImpl...");
 
     // knp::backends::cpu::init(projections_, get_message_endpoint());
-    // for (const auto &p : device_projections_)
     for (size_t i = 0; i < device_projections_.size(); ++i)
     {
-        const auto [pre_uid, post_uid, this_uid] = get_projection_uids(device_projections_.data() + i);
+        const auto [pre_uid, post_uid, this_uid] = ::cuda::std::visit([](auto &proj)
+            {
+                return std::make_tuple(proj.presynaptic_uid_, proj.postsynaptic_uid_, proj.uid_);
+            }, device_projections_[i]);
         if (!cuda::empty_uid(pre_uid)) this->device_message_bus_.subscribe_gpu<cuda::SpikeMessage>(this_uid, {pre_uid});
         if (!cuda::empty_uid(post_uid))
         {

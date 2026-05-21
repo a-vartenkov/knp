@@ -382,6 +382,12 @@ __global__ void get_projection_uids_kernel(const CUDABackendImpl::ProjectionVari
                                            cuda::UID *post_uid,
                                            cuda::UID *self_uid)
 {
+    if (!projection)
+    {
+        *pre_uid = make_empty_uid();
+        *post_uid = make_empty_uid();
+        *self_uid = make_empty_uid();
+    }
     ::cuda::std::visit([pre_uid, post_uid, self_uid](const auto &proj)
         {
             *pre_uid = proj.presynaptic_uid_;
