@@ -284,14 +284,14 @@ void CUDABackendImpl::calculate_projections(unsigned long long step)
 
     if (!device_projections_.size()) return;
 
-    std::vector<device_lib::CUDAVector<unsigned long long>> projection_messages(device_projections_.size());
+    std::vector<device_lib::CUDAVector<unsigned long long>> projection_messages;
+    projection_messages.reserve(device_projections_.size());
     for (size_t i = 0; i < device_projections_.size(); ++i)
     {
         const device_lib::CUDAVector<unsigned long long> message_ids
             = device_message_bus_.unload_messages<cuda::SpikeMessage>(projection_uids.copy_at(i));
         projection_messages.push_back(message_ids);
     }
-
     assert(device_projections_.size() == projection_messages.size());
     for (size_t i = 0; i < device_projections_.size(); ++i)
     {
