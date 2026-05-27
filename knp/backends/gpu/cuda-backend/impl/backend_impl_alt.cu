@@ -273,6 +273,7 @@ void CUDABackendImpl::calculate_populations(unsigned long long step)
                                                               population_messages.data(), population_messages.size(),
                                                               out_messages.data(), step);
     cudaDeviceSynchronize();
+    SPDLOG_DEBUG("Sending {} spike messages.", out_messages.size());
     device_message_bus_.send_message_gpu_batch(out_messages);
 }
 
@@ -586,6 +587,7 @@ __host__ unsigned long long CUDABackendImpl::route_projection_messages(unsigned 
                    if (proj.message_buf_.impacts_.size())
                    {
                        device_message_bus_.send_message(proj.message_buf_);
+                       proj.message_buf_.impacts_.clear();
                        ++sent_message_counter;
                    }
                }, device_projections_[i]);
@@ -761,7 +763,6 @@ __global__ void get_spike_message_data(device_lib::CUDAVectorView<cuda::MessageV
         return;
     }
     *data_pointer = ::cuda::std::get<cuda::SpikeMessage>(message_var).neuron_indexes_.data();
-    // printf("Data pointer %p", data_pointer);
     *size = ::cuda::std::get<cuda::SpikeMessage>(message_var).neuron_indexes_.size();
 }
 
