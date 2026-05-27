@@ -117,7 +117,7 @@ struct CUDAProjection
         unsigned long long *res_impacts;
         cudaMalloc(&res_steps, sizeof(unsigned long long) * out_size);
         cudaMalloc(&res_impacts, sizeof(unsigned long long) * out_size);
-        thrust::merge_by_key(new_sending_steps.data(), new_sending_steps.data() + size,
+        thrust::merge_by_key(thrust::device, new_sending_steps.data(), new_sending_steps.data() + size,
                              sending_steps_.data(), sending_steps_.data() + sending_steps_.size(),
                              new_impacts_indexes.data(), impact_indexes_.data(), res_steps, res_impacts);
         impact_indexes_ = device_lib::CUDAVector<unsigned long long>{res_impacts, out_size};
@@ -129,7 +129,7 @@ struct CUDAProjection
      * @param current_step current step.
      * @return Synaptic impact message that would be sent.
      */
-    __host__ std::optional<cuda::SynapticImpactMessage> form_message(unsigned long long current_step);
+    __host__ void form_message(unsigned long long current_step);
 
     /**
      * @brief UID.
@@ -166,6 +166,11 @@ struct CUDAProjection
      */
     device_lib::CUDAVector<unsigned long long> impact_indexes_;
     device_lib::CUDAVector<unsigned long long> sending_steps_;
+
+    /**
+     * @brief Message buffer.
+     */
+    SynapticImpactMessage message_buf_;
 };
 
 } // namespace knp::backends::gpu::cuda

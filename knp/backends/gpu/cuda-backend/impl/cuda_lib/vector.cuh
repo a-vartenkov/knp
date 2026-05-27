@@ -85,7 +85,11 @@ public:
     __host__ CUDAVector(const std::initializer_list<value_type> &init_list)
         : capacity_(init_list.size()), size_(init_list.size())
     {
-        if (!size_) return;
+        if (!size_)
+        {
+            data_ = nullptr;
+            return;
+        }
         data_ = allocator_.allocate(capacity_);
         if constexpr (std::is_trivially_copyable<value_type>::value)
         {
@@ -108,8 +112,8 @@ public:
      */
     __host__ CUDAVector(value_type* &data, size_type size) : data_(data), size_(size), capacity_(size)
     {
-        data = nullptr;
     }
+
 
     __host__ explicit CUDAVector(const std::vector<value_type> &vec) : capacity_(vec.size()), size_(vec.size())
     {
@@ -180,7 +184,7 @@ public:
     }
 
 
-    __host__ __device__ explicit CUDAVector(size_type size = 0) : capacity_(size), size_(size)
+    __host__ __device__ explicit CUDAVector(size_type size = 0) : capacity_(size), size_(size), data_(nullptr)
     {
         if (!size_) return;
         data_ = allocator_.allocate(capacity_);

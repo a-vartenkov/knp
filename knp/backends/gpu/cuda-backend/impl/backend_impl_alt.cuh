@@ -254,7 +254,7 @@ public:
 
     // __host__ unsigned long long route_population_messages(unsigned long long step);
 
-    // __host__ unsigned long long route_projection_messages(unsigned long long step);
+    __host__ unsigned long long route_projection_messages(unsigned long long step);
 
 
     // [[nodiscard]] DataRanges get_network_data() const { return {}; }
