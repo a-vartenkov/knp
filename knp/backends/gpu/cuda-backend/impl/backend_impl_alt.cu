@@ -493,8 +493,6 @@ __device__ ::cuda::std::optional<knp::backends::gpu::cuda::SpikeMessage> CUDABac
                 }
             }*/
             population.neurons_[impact.postsynaptic_neuron_index_] = neuron;
-            if (neuron.potential_ > 0) PRINTF_TRACE("Neuron %u potential is %f\n", impact.postsynaptic_neuron_index_,
-                                                    static_cast<float>(neuron.potential_)); //TEMP
         }
     }
 
@@ -826,6 +824,7 @@ __host__ void CUDABackendImpl::calculate_projection(
 
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDABackendImpl::PopulationVariants);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDABackendImpl::ProjectionVariants);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::SynapticImpact);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAPopulation<knp::neuron_traits::BLIFATNeuron>);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAProjection<knp::synapse_traits::DeltaSynapse>);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAProjection<knp::synapse_traits::DeltaSynapse>::Synapse);

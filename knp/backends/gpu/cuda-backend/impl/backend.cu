@@ -315,6 +315,7 @@ REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAProjection<knp::synapse_
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAProjection<knp::synapse_traits::DeltaSynapse>::Synapse);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAPopulation<knp::neuron_traits::BLIFATNeuron>::NeuronParameters);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::Subscription);
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::SynapticImpact);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::MessageVariant);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::UID);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::device_lib::CUDAVector<unsigned long long>);
