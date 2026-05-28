@@ -684,13 +684,10 @@ __global__ void calculate_impacts_per_spike(
 {
     size_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= spike_ids.size_) return;
-    SpikeIndex neuron_id = 0; // spike_ids.data_[i];
+    SpikeIndex neuron_id = spike_ids.data_[i];
 
-    printf("Neuron id: %u, pointer %p\n", neuron_id, spike_ids.data_);
     unsigned long long start = index.offsets_ptr_[neuron_id];
-    printf("Start: %lu, offsets %p\n", start, index.offsets_ptr_);
     unsigned long long size = index.offsets_ptr_[neuron_id + 1] - index.offsets_ptr_[neuron_id];
-    printf("Size: %lu\n", size);
     auto [num_blocks, num_threads] = device_lib::get_blocks_config(size);
     calculate_synaptic_impact<<<num_blocks, num_threads>>>(synapses, index.indices_ptr_ + start, size, current_step,
                                                            results + start, send_steps + start);
