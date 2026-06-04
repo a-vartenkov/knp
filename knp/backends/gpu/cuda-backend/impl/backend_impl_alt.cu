@@ -716,7 +716,7 @@ __global__ void delta_indices_to_impacts_kernel(unsigned long long *indices_begi
     unsigned long long *index = indices_begin + i;
     if (index >= indices_end) return;
     unsigned long long synapse_id = *index;
-    if (synapse_id > synapses.size_) return;
+    if (synapse_id >= synapses.size_) return;
     auto &synapse = ::cuda::std::get<0>(synapses.data_[synapse_id]);
     SynapticImpact impact_out;
     impact_out.connection_index_ = synapse_id;
@@ -724,7 +724,7 @@ __global__ void delta_indices_to_impacts_kernel(unsigned long long *indices_begi
     impact_out.synapse_type_ = synapse.output_type_;
     impact_out.presynaptic_neuron_index_ = ::cuda::std::get<1>(synapses.data_[synapse_id]);
     impact_out.postsynaptic_neuron_index_ = ::cuda::std::get<2>(synapses.data_[synapse_id]);
-    impacts_out[synapse_id] = impact_out;
+    impacts_out[i] = impact_out;
 }
 
 
