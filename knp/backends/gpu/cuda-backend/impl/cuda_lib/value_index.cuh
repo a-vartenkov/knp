@@ -71,6 +71,15 @@ __global__ void summarize_index_kernel(IndexView index, device_lib::CUDAVectorVi
 __host__ unsigned long long count_values_by_indexes(const ValueIndex &index,
                                                     const CUDAVectorView<cuda::SpikeIndex> inputs);
 
+/**
+ * @brief Build exclusive prefix sum for number of synapses per neuron.
+ * @param index the built value index.
+ * @param inputs spiked neuron indices.
+ * @return a vector of "output" offsets for each neuron.
+ */
+__host__ CUDAVector<unsigned long long> calculate_neuron_scan(const ValueIndex &index,
+                                                              const CUDAVectorView<cuda::SpikeIndex> inputs);
+
 
 template <class SynapseType>
 __host__ ValueIndex build_index(const knp::core::Projection<SynapseType> &cpu_projection)
@@ -104,7 +113,7 @@ __host__ ValueIndex build_index(const knp::core::Projection<SynapseType> &cpu_pr
         {
             offsets.push_back(current_offset);
         }
-        first_neuron = current_neuron;
+        first_neuron = current_neuron + 1;
         std::copy(iter->second.begin(), iter->second.end(), indices.begin() + current_offset);
         current_offset += iter->second.size();
         offsets.push_back(current_offset);

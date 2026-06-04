@@ -136,12 +136,16 @@ __global__ void find_messages_kernel(const MessageVariant *messages, size_t mess
                               unsigned long long *indices, unsigned long long *counter)
 {
     unsigned long long i = blockIdx.x * blockDim.x + threadIdx.x;
+    printf("Find message kernel, i %lu\n", i);
     if (i >= messages_size) return;
     if (subscription->is_my_message(messages[i]))
     {
         unsigned long long index = atomicAdd(counter, 1ull);
+        printf("Found message: index %lu, message_index %lu\n", i, index);
         indices[index] = i;
     }
+    else
+        printf("No message found!\n");
 }
 
 
@@ -159,18 +163,20 @@ device_lib::CUDAVector<unsigned long long> CUDAMessageBus::unload_messages(const
 
     auto [num_blocks, num_threads] = device_lib::get_blocks_config(messages_to_route_.size());
     unsigned long long *counter;
-    const unsigned long long counter_start = 0;
     // cudaMallocManaged(&counter, 0);
-    cudaMalloc(&counter, sizeof(unsigned long long));
-    cudaMemcpy(counter, &counter_start, sizeof(unsigned long long), cudaMemcpyHostToDevice);
+    call_and_check(cudaMalloc(&counter, sizeof(unsigned long long)));
+    cudaMemset(counter, 0, sizeof(unsigned long long));
     unsigned long long *indices;
     cudaMalloc(&indices, sizeof(unsigned long long) * messages_to_route_.size());
+    SPDLOG_TRACE("Starting kernel: messages {}, {}, subscription {}, {}, i{}", (void *)(messages_to_route_.data()),
+                 messages_to_route_.size(), (void *)(subscriptions_.data()), subscriptions_.size(), sub_index);
     find_messages_kernel<<<num_blocks, num_threads>>>(messages_to_route_.data(), messages_to_route_.size(),
                subscriptions_.data() + sub_index, indices, counter);
     // Here we have a set of message indexes. Is that enough? I think it is.
     size_t cpu_counter;
-    cudaMemcpy(&cpu_counter, counter, sizeof(cpu_counter), cudaMemcpyDeviceToHost);
-    cudaFree(counter);
+    call_and_check(cudaDeviceSynchronize());
+    call_and_check(cudaMemcpy(&cpu_counter, counter, sizeof(cpu_counter), cudaMemcpyDeviceToHost));
+    call_and_check(cudaFree(counter));
     SPDLOG_TRACE("Found {} incoming messages.", cpu_counter);
     device_lib::CUDAVector<unsigned long long> result(cpu_counter);
     if (cpu_counter != 0)
@@ -178,7 +184,8 @@ device_lib::CUDAVector<unsigned long long> CUDAMessageBus::unload_messages(const
         auto [num_blocks_copy, num_threads_copy] = device_lib::get_blocks_config(cpu_counter);
         device_lib::copy_kernel<<<num_blocks_copy, num_threads_copy>>>(result.data(), cpu_counter, indices);
     }
-    cudaFree(indices);
+    cudaDeviceSynchronize();
+    call_and_check(cudaFree(indices));
     return result;
 }
 
