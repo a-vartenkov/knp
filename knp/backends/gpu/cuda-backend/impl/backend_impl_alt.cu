@@ -585,6 +585,7 @@ __host__ unsigned long long CUDABackendImpl::route_projection_messages(unsigned 
                    if (proj.message_buf_.impacts_.size())
                    {
                        device_message_bus_.send_message(proj.message_buf_);
+                       cudaDeviceSynchronize();
                        proj.message_buf_.impacts_.clear();
                        ++sent_message_counter;
                    }

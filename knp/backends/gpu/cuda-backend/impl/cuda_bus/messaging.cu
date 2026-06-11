@@ -24,6 +24,7 @@
 #include "subscription.cuh"
 #include "../cuda_lib/extraction.cuh"
 #include "../cuda_lib/register_all.cuh"
+#include "../cuda_lib/vector_kernels.cuh"
 
 #include <type_traits>
 
@@ -80,6 +81,7 @@ void gpu_insert<MessageVariant>(const MessageVariant &cpu_source, MessageVariant
         call_and_check(cudaMalloc(&buffer, sizeof(ValueType)));
         gpu_insert(val, buffer);
         device_lib::make_variant_kernel<<<1, 1>>>(gpu_target, buffer);
+        device_lib::destruct_kernel<ValueType, device_lib::CuMallocAllocator<ValueType>><<<1, 1>>>(buffer, 1);
         call_and_check(cudaFree(buffer));
     }, cpu_source);
 }

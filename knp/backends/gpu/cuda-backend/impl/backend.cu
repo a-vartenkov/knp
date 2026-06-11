@@ -139,6 +139,7 @@ void CUDABackend::_step()
     SPDLOG_DEBUG("Message bus 8 {}", impl_->get_message_bus().get_num_messages());
     get_message_bus().route_messages();
     SPDLOG_DEBUG("Message bus 9 {}", impl_->get_message_bus().get_num_messages());
+    SPDLOG_DEBUG("Step {}", step);
     impl_->route_projection_messages(step);
     SPDLOG_DEBUG("Message bus 10 {}", impl_->get_message_bus().get_num_messages());
     SPDLOG_DEBUG("Step finished #{}.", get_step());
