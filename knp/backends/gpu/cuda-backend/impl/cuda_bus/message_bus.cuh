@@ -165,6 +165,11 @@ public:
     template <class MessageType>
     __host__ device_lib::CUDAVector<unsigned long long> unload_messages(const cuda::UID &receiver_uid);
 
+    __host__ device_lib::CUDAVectorView<MessageVariant> get_all_messages_view() const
+    {
+        return messages_to_route_.view();
+    }
+
     __host__ size_t get_num_messages() { return messages_to_route_.size(); }
 
 public:

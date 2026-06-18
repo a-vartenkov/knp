@@ -114,7 +114,6 @@ public:
     {
     }
 
-
     __host__ explicit CUDAVector(const std::vector<value_type> &vec) : capacity_(vec.size()), size_(vec.size())
     {
         if (!vec.size()) return;
@@ -581,10 +580,10 @@ public:
         T* source_data = data_;
         data_ = allocator_.allocate(capacity_);
     #ifdef __CUDA_ARCH__ // Device only:
-        PRINTF_TRACE("Device vector actualize\n");
+        // PRINTF_TRACE("Device vector actualize\n");
         for (size_t i = 0; i < size_; ++i)
             new (data_ + i) T(*(source_data + i));
-        PRINTF_TRACE("End device vector actualize\n");
+        // PRINTF_TRACE("End device vector actualize\n");
 
     #else // Host only:
         FAST_ERROR_CHECK(typeid(T).name() + std::string(" Starting actualize: {}"));

@@ -210,74 +210,6 @@ device_lib::CUDAVector<cuda::UID> get_uids_std(const std::vector<VectorData> &en
 }
 
 
-/// @note: out_messages_data should be of size to contain at least num_populations messages.
-__global__ void calculate_populations_kernel(CUDABackendImpl::PopulationVariants *populations, size_t num_populations,
-                                             const cuda::MessageVariant *messages, size_t messages_size,
-                                             const cuda::device_lib::CUDAVector<unsigned long long> *indices,
-                                             size_t indices_size,
-                                             cuda::MessageVariant *out_messages_data, unsigned long long step)
-{
-    // Calculate populations. This is the same as inference.
-    size_t thread_index = blockIdx.x * blockDim.x + threadIdx.x;
-    if (thread_index >= num_populations) return;
-
-    CUDABackendImpl::PopulationVariants &population = populations[thread_index];
-    knp::backends::gpu::cuda::device_lib::CUDAVector<cuda::MessageVariant> new_messages;
-    PRINTF_TRACE("Population index: %lu\n", population.index());
-
-    size_t num_messages = indices[thread_index].size();
-    PRINTF_TRACE("Num messages: %lu\n", num_messages);
-    for (size_t n = 0; n < num_messages; ++n)
-    {
-        unsigned long long message_index = indices[thread_index][n];
-        if (message_index >= messages_size) continue;
-        PRINTF_TRACE("Population messages size: %lu, message index: %lu\n", messages_size,
-                     message_index);
-        new_messages.push_back(messages[message_index]);
-    }
-
-    auto message = ::cuda::std::visit([&new_messages, step](auto &pop)
-                                      {
-                                          PRINTF_TRACE("Population messages size: %lu\n", new_messages.size());
-                                          return CUDABackendImpl::calculate_population(pop, new_messages, step);
-                                      }, population);
-
-    if (message) out_messages_data[thread_index] = cuda::MessageVariant{message.value()};
-}
-
-
-void CUDABackendImpl::calculate_populations(unsigned long long step)
-{
-    // Calculate populations. This is the same as inference.
-    using MessageVector = device_lib::CUDAVector<cuda::MessageVariant>;
-    if (!device_populations_.size()) return;
-
-    device_lib::CUDAVector<cuda::UID> population_uids = get_uids(device_populations_);
-    auto [num_blocks, num_threads] = device_lib::get_blocks_config(device_populations_.size());
-
-    device_lib::CUDAVector<device_lib::CUDAVector<unsigned long long>> population_messages(device_populations_.size());
-
-    for (size_t i = 0; i < device_populations_.size(); ++i)
-    {
-        const device_lib::CUDAVector<unsigned long long> message_ids =
-                device_message_bus_.unload_messages<SynapticImpactMessage>(
-                    population_uids.copy_at(i));
-        gpu_insert(message_ids, population_messages.data() + i);
-    }
-
-    MessageVector out_messages(device_populations_.size());
-    assert(device_populations_.size() == population_messages.size());
-    calculate_populations_kernel<<<num_blocks, num_threads>>>(device_populations_.data(), device_populations_.size(),
-                                                              device_message_bus_.all_messages().data(),
-                                                              device_message_bus_.all_messages().size(),
-                                                              population_messages.data(), population_messages.size(),
-                                                              out_messages.data(), step);
-    cudaDeviceSynchronize();
-    SPDLOG_DEBUG("Sending {} spike messages.", out_messages.size());
-    device_message_bus_.send_message_gpu_batch(out_messages);
-}
-
-
 void CUDABackendImpl::calculate_projections(unsigned long long step)
 {
     // Calculate projections.
@@ -413,162 +345,193 @@ void CUDABackendImpl::init()
 }
 
 
-__device__ ::cuda::std::optional<knp::backends::gpu::cuda::SpikeMessage> CUDABackendImpl::calculate_population(
-        CUDAPopulation<knp::neuron_traits::BLIFATNeuron> &population,
-        const knp::backends::gpu::cuda::device_lib::CUDAVector<cuda::MessageVariant> &messages,
-        unsigned long long step_n)
+using BlifatParams = ::knp::neuron_traits::neuron_parameters<::knp::neuron_traits::BLIFATNeuron>;
+
+
+__global__ void calculate_neurons_pre_impact(device_lib::CUDAVectorMutableView<BlifatParams> neurons,
+                                             unsigned long long current_step)
 {
-    constexpr size_t spike_message_index =
+    size_t neuron_index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (neuron_index >= neurons.size_) return;
+
+    BlifatParams &neuron = neurons.data_[neuron_index];
+    ++neuron.n_time_steps_since_last_firing_;
+    neuron.dynamic_threshold_ *= neuron.threshold_decay_;
+    neuron.postsynaptic_trace_ *= neuron.postsynaptic_trace_decay_;
+    neuron.inhibitory_conductance_ *= neuron.inhibitory_conductance_decay_;
+
+    /*
+    if constexpr (has_dopamine_plasticity<BlifatLikeNeuron>())
+    {
+        neuron.dopamine_value_ = 0.0;
+        neuron.is_being_forced_ = false;
+    }
+    */
+
+    if (neuron.bursting_phase_ && !--neuron.bursting_phase_)
+    {
+        neuron.potential_ = neuron.potential_ * neuron.potential_decay_ + neuron.reflexive_weight_;
+    }
+    else
+    {
+        neuron.potential_ *= neuron.potential_decay_;
+    }
+    neuron.pre_impact_potential_ = neuron.potential_;
+}
+
+
+__global__ void calculate_neurons_impacts(device_lib::CUDAVectorMutableView<BlifatParams> neurons,
+                                          device_lib::CUDAVectorView<SynapticImpact> impacts)
+{
+    size_t impact_index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (impact_index >= impacts.size_) return;
+    const SynapticImpact &impact = impacts.data_[impact_index];
+    if (impact.postsynaptic_neuron_index_ >= neurons.size_) return;
+    auto &neuron = neurons.data_[impact.postsynaptic_neuron_index_];
+    switch (impact.synapse_type_)
+    {
+        case knp::synapse_traits::OutputType::EXCITATORY:
+            atomicAdd(&neuron.potential_, impact.impact_value_);
+            break;
+        case knp::synapse_traits::OutputType::INHIBITORY_CURRENT:
+            atomicAdd(&neuron.potential_, -impact.impact_value_);
+            break;
+        case knp::synapse_traits::OutputType::INHIBITORY_CONDUCTANCE:
+            atomicAdd(&neuron.inhibitory_conductance_, impact.impact_value_);
+            break;
+        case knp::synapse_traits::OutputType::DOPAMINE:
+            atomicAdd(&neuron.dopamine_value_, impact.impact_value_);
+            break;
+        case knp::synapse_traits::OutputType::BLOCKING:
+            neuron.total_blocking_period_ = static_cast<unsigned int>(impact.impact_value_);
+            break;
+    }
+}
+
+
+__global__ void calculate_neurons_impacts_all(device_lib::CUDAVectorMutableView<BlifatParams> neurons,
+          device_lib::CUDAVectorView<MessageVariant> messages_all,
+          device_lib::CUDAVectorView<unsigned long long> message_ids)
+{
+    // This is a kernel run for each message directed to a single population. It's very often alone.
+    unsigned long long thread_index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (thread_index >= message_ids.size_) return;
+    unsigned long long current_message_id = message_ids.data_[thread_index];
+    constexpr unsigned long long synaptic_impact_index =
             boost::mp11::mp_find<cuda::MessageVariant, cuda::SynapticImpactMessage>();
+    assert(current_message_id < messages_all.size_);
+    const cuda::MessageVariant &msg = messages_all.data_[current_message_id];
+    assert(msg.index() == synaptic_impact_index);
 
-    // TODO rework
-    for (size_t i = 0; i < population.neurons_.size(); ++i)
+    auto [num_blocks, num_threads] = device_lib::get_blocks_config(message_ids.size_);
+    calculate_neurons_impacts<<<num_blocks, num_threads>>>(neurons,
+           ::cuda::std::get<synaptic_impact_index>(msg).impacts_.view());
+}
+
+
+__global__ void calculate_neurons_post_impact(device_lib::CUDAVectorMutableView<BlifatParams> neurons,
+                                              SpikeIndex *spike_buffer, SpikeIndex *size_counter)
+{
+    size_t neuron_index = blockIdx.x * blockDim.x + threadIdx.x;
+    bool spike = false;
+    neuron_traits::neuron_parameters <neuron_traits::BLIFATNeuron> &neuron = neurons.data_[neuron_index];
+    if (neuron.total_blocking_period_ <= 0)
     {
-        neuron_traits::neuron_parameters <neuron_traits::BLIFATNeuron> neuron = population.neurons_[i];
-        ++neuron.n_time_steps_since_last_firing_;
-        neuron.dynamic_threshold_ *= neuron.threshold_decay_;
-        neuron.postsynaptic_trace_ *= neuron.postsynaptic_trace_decay_;
-        neuron.inhibitory_conductance_ *= neuron.inhibitory_conductance_decay_;
-
-        /*
-        if constexpr (has_dopamine_plasticity<BlifatLikeNeuron>())
-        {
-            neuron.dopamine_value_ = 0.0;
-            neuron.is_being_forced_ = false;
-        }
-        */
-
-        if (neuron.bursting_phase_ && !--neuron.bursting_phase_)
-        {
-            neuron.potential_ = neuron.potential_ * neuron.potential_decay_ + neuron.reflexive_weight_;
-        }
-        else
-        {
-            neuron.potential_ *= neuron.potential_decay_;
-        }
-        neuron.pre_impact_potential_ = neuron.potential_;
-
-        population.neurons_[i] = neuron;
+        // TODO: Make it more readable, don't be afraid to use if operators.
+        // Restore potential that the neuron had before impacts.
+        neuron.potential_ = neuron.pre_impact_potential_;
+        bool was_negative = neuron.total_blocking_period_ < 0;
+        // If it is negative, increase by 1.
+        neuron.total_blocking_period_ += was_negative;
+        // If it is now zero, but was negative before, increase it to max, else leave it as is.
+        neuron.total_blocking_period_ +=
+                std::numeric_limits<int64_t>::max() * ((neuron.total_blocking_period_ == 0) && was_negative);
+    }
+    else
+    {
+        neuron.total_blocking_period_ -= 1;
     }
 
-    // process_inputs(population, messages);
-    PRINTF_TRACE("Processing synaptic impacts for population\n");
-    for (const knp::backends::gpu::cuda::MessageVariant &message_var : messages)
+    if (neuron.inhibitory_conductance_ < 1.0)
     {
-        if (message_var.index() != spike_message_index) continue;
-        const SynapticImpactMessage &message = ::cuda::std::get<SynapticImpactMessage>(message_var);
-        PRINTF_TRACE("Message size is %lu\n", message.impacts_.size());
-        for (size_t i = 0; i < message.impacts_.size(); ++i)
+        neuron.potential_ -=
+                (neuron.potential_ - neuron.reversal_inhibitory_potential_) *
+                neuron.inhibitory_conductance_;
+    }
+    else
+    {
+        neuron.potential_ = neuron.reversal_inhibitory_potential_;
+    }
+
+    if ((neuron.n_time_steps_since_last_firing_ > neuron.absolute_refractory_period_) &&
+        (neuron.potential_ >= neuron.activation_threshold_ + neuron.dynamic_threshold_))
+    {
+        // Spike.
+        neuron.dynamic_threshold_ += neuron.threshold_increment_;
+        neuron.postsynaptic_trace_ += neuron.postsynaptic_trace_increment_;
+
+        neuron.potential_ = neuron.potential_reset_value_;
+        neuron.bursting_phase_ = neuron.bursting_period_;
+        neuron.n_time_steps_since_last_firing_ = 0;
+        spike = true;
+    }
+
+    if (neuron.potential_ < neuron.min_potential_)
+    {
+        neuron.potential_ = neuron.min_potential_;
+    }
+    if (spike)
+    {
+        SpikeIndex counter = atomicAdd(size_counter, 1);
+        spike_buffer[counter] = neuron_index;
+    }
+}
+
+
+device_lib::CUDAVector<SpikeIndex> CUDABackendImpl::calculate_population(
+        CUDAPopulation<knp::neuron_traits::BLIFATNeuron> &population, unsigned long long step)
+{
+    auto [num_blocks_neuro, num_threads_neuro] = device_lib::get_blocks_config(population.neurons_.size());
+
+    calculate_neurons_pre_impact<<<num_blocks_neuro, num_threads_neuro>>>(population.neurons_.mut_view(), step);
+    device_lib::CUDAVector<unsigned long long> message_ids
+            = device_message_bus_.unload_messages<cuda::SynapticImpactMessage>(population.uid_);
+
+    auto [num_blocks_msg, num_threads_msg] = device_lib::get_blocks_config(message_ids.size());
+    calculate_neurons_impacts_all<<<num_blocks_msg, num_threads_msg>>>(population.neurons_.mut_view(),
+            device_message_bus_.get_all_messages_view(), message_ids.view());
+
+    SpikeIndex *output;
+    cudaMalloc(&output, sizeof(SpikeIndex) * population.neurons_.size());
+    SpikeIndex *counter;
+    cudaMalloc(&counter, sizeof(SpikeIndex));
+    cudaMemset(counter, 0, sizeof(SpikeIndex));
+    calculate_neurons_post_impact<<<num_blocks_neuro, num_threads_neuro>>>(population.neurons_.mut_view(), output,
+                                                                           counter);
+
+    SpikeIndex out_size = 0;
+    cudaMemcpy(&out_size, counter, sizeof(SpikeIndex), cudaMemcpyDeviceToHost);
+    // Capacity would be "out_size" while the ptr is larger, but that doesn't matter as the pointer is freed as a whole.
+    device_lib::CUDAVector<SpikeIndex> result{output, out_size};
+    cudaFree(counter);
+    return result;
+}
+
+
+void CUDABackendImpl::calculate_populations(unsigned long long step)
+{
+    for (auto &population : device_populations_)
+    {
+        ::cuda::std::visit([this, step](auto &pop)
         {
-            const auto &impact = message.impacts_[i];
-
-            neuron_traits::neuron_parameters <neuron_traits::BLIFATNeuron> neuron =
-                    population.neurons_[impact.postsynaptic_neuron_index_];
-
-            // impact_neuron<BlifatLikeNeuron>(neuron, impact.synapse_type_, impact.impact_value_);
-            switch (impact.synapse_type_)
+            auto spikes = calculate_population(pop, step);
+            if (!spikes.empty())
             {
-                case knp::synapse_traits::OutputType::EXCITATORY:
-                    neuron.potential_ += impact.impact_value_;
-                    break;
-                case knp::synapse_traits::OutputType::INHIBITORY_CURRENT:
-                    neuron.potential_ -= impact.impact_value_;
-                    break;
-                case knp::synapse_traits::OutputType::INHIBITORY_CONDUCTANCE:
-                    neuron.inhibitory_conductance_ += impact.impact_value_;
-                    break;
-                case knp::synapse_traits::OutputType::DOPAMINE:
-                    neuron.dopamine_value_ += impact.impact_value_;
-                    break;
-                case knp::synapse_traits::OutputType::BLOCKING:
-                    neuron.total_blocking_period_ = static_cast<unsigned int>(impact.impact_value_);
-                    break;
+                cuda::SpikeMessage message{MessageHeader{pop.uid_, step, false}, std::move(spikes)};
+                device_message_bus_.send_message(std::move(message));
             }
-
-            /*if constexpr (has_dopamine_plasticity<BlifatLikeNeuron>())
-            {
-                if (impact.synapse_type_ == synapse_traits::OutputType::EXCITATORY)
-                {
-                    neuron.is_being_forced_ |= message.is_forcing_;
-                }
-            }*/
-            population.neurons_[impact.postsynaptic_neuron_index_] = neuron;
-        }
+        }, population);
     }
-
-    device_lib::CUDAVector<uint32_t> neuron_indexes;
-
-    // calculate_neurons_post_input_state(population, neuron_indexes);
-    for (size_t index = 0; index < population.neurons_.size(); ++index)
-    {
-        bool spike = false;
-        neuron_traits::neuron_parameters <neuron_traits::BLIFATNeuron> neuron = population.neurons_[index];
-        if (neuron.total_blocking_period_ <= 0)
-        {
-            // TODO: Make it more readable, don't be afraid to use if operators.
-            // Restore potential that the neuron had before impacts.
-            neuron.potential_ = neuron.pre_impact_potential_;
-            bool was_negative = neuron.total_blocking_period_ < 0;
-            // If it is negative, increase by 1.
-            neuron.total_blocking_period_ += was_negative;
-            // If it is now zero, but was negative before, increase it to max, else leave it as is.
-            neuron.total_blocking_period_ +=
-                    std::numeric_limits<int64_t>::max() * ((neuron.total_blocking_period_ == 0) && was_negative);
-        }
-        else
-        {
-            neuron.total_blocking_period_ -= 1;
-        }
-
-        if (neuron.inhibitory_conductance_ < 1.0)
-        {
-            neuron.potential_ -=
-                    (neuron.potential_ - neuron.reversal_inhibitory_potential_) *
-                    neuron.inhibitory_conductance_;
-        }
-        else
-        {
-            neuron.potential_ = neuron.reversal_inhibitory_potential_;
-        }
-
-        if ((neuron.n_time_steps_since_last_firing_ > neuron.absolute_refractory_period_) &&
-            (neuron.potential_ >= neuron.activation_threshold_ + neuron.dynamic_threshold_))
-        {
-            // Spike.
-            neuron.dynamic_threshold_ += neuron.threshold_increment_;
-            neuron.postsynaptic_trace_ += neuron.postsynaptic_trace_increment_;
-
-            neuron.potential_ = neuron.potential_reset_value_;
-            neuron.bursting_phase_ = neuron.bursting_period_;
-            neuron.n_time_steps_since_last_firing_ = 0;
-            spike = true;
-        }
-
-        if (neuron.potential_ < neuron.min_potential_)
-        {
-            neuron.potential_ = neuron.min_potential_;
-        }
-
-        if (spike)
-        {
-            neuron_indexes.push_back(index);
-        }
-
-        population.neurons_[index] = neuron;
-    }
-    if (!neuron_indexes.empty())
-    {
-        PRINTF_TRACE("Spike vector is not empty: size %lu\n", neuron_indexes.size());
-        cuda::SpikeMessage res_message
-                {
-                        .header_ = {.sender_uid_ = population.uid_, step_n},
-                        .neuron_indexes_ = neuron_indexes
-                };
-
-        return res_message;
-    }
-    PRINTF_TRACE("Spike vector empty\n");
-    return {};
 }
 
 
@@ -613,25 +576,25 @@ __host__ void CUDABackendImpl::calculate_projection(
 }
 
 
-__host__ __device__ CUDABackendImpl::PopulationIterator CUDABackendImpl::begin_populations()
+__host__ CUDABackendImpl::PopulationIterator CUDABackendImpl::begin_populations()
 {
     return PopulationIterator{device_populations_.begin()};
 }
 
 
-__host__ __device__ CUDABackendImpl::PopulationConstIterator CUDABackendImpl::begin_populations() const
+__host__ CUDABackendImpl::PopulationConstIterator CUDABackendImpl::begin_populations() const
 {
     return {device_populations_.cbegin()};
 }
 
 
-__host__ __device__ CUDABackendImpl::PopulationIterator CUDABackendImpl::end_populations()
+__host__ CUDABackendImpl::PopulationIterator CUDABackendImpl::end_populations()
 {
     return PopulationIterator{device_populations_.end()};
 }
 
 
-__host__ __device__ CUDABackendImpl::PopulationConstIterator CUDABackendImpl::end_populations() const
+__host__ CUDABackendImpl::PopulationConstIterator CUDABackendImpl::end_populations() const
 {
     return device_populations_.cend();
 }
@@ -702,7 +665,7 @@ __global__ void calculate_impacts_per_spike(
     unsigned long long size = index.offsets_ptr_[neuron_id + 1] - index.offsets_ptr_[neuron_id];
     unsigned long long output_start = start_offsets.data_[i];
     auto [num_blocks, num_threads] = device_lib::get_blocks_config(size);
-    printf("Calc impacts: start %lu, size %lu, out_start %lu\n", start, size, output_start);
+    // printf("Calc impacts: start %lu, size %lu, out_start %lu\n", start, size, output_start);
     calculate_synaptic_impact<<<num_blocks, num_threads>>>(synapses, index.indices_ptr_ + start, size, current_step,
                                                            results + output_start, send_steps + output_start);
     __syncthreads(); // TODO TEMP

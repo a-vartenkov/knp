@@ -116,7 +116,7 @@ public:
     /**
      * @brief Type of population container.
      */
-    using PopulationContainer = device_lib::CUDAVector<PopulationVariants>;
+    using PopulationContainer = std::vector<PopulationVariants>;
 
     /**
      * @brief Type of projection container.
@@ -176,23 +176,23 @@ public:
      * @brief Get an iterator pointing to the first element of the population loaded to backend.
      * @return population iterator.
      */
-    __host__ __device__ PopulationIterator begin_populations();
+    __host__ PopulationIterator begin_populations();
 
     /**
      * @brief Get an iterator pointing to the first element of the population loaded to backend.
      * @return constant population iterator.
      */
-    __host__ __device__ PopulationConstIterator begin_populations() const;
+    __host__ PopulationConstIterator begin_populations() const;
     /**
      * @brief Get an iterator pointing to the last element of the population.
      * @return iterator.
      */
-    __host__ __device__ PopulationIterator end_populations();
+    __host__ PopulationIterator end_populations();
     /**
      * @brief Get a constant iterator pointing to the last element of the population.
      * @return iterator.
      */
-    __host__ __device__ PopulationConstIterator end_populations() const;
+    __host__ PopulationConstIterator end_populations() const;
 
     /**
      * @todo Make iterator which returns projections, but not a wrapper.
@@ -256,7 +256,6 @@ public:
 
     __host__ unsigned long long route_projection_messages(unsigned long long step);
 
-
     // [[nodiscard]] DataRanges get_network_data() const { return {}; }
 
 public:
@@ -267,19 +266,20 @@ public:
 public:
     /**
      * @brief Calculate population of BLIFAT neurons.
-     * @note Population will be changed during calculation. TODO: __host__, parallelize populations
+     * @note Population will be changed during calculation.
      * @param population population to calculate.
-     * @return copy of a spike message if population is emitting one.
+     * @return set of spiked neuron indices.
      */
-    static __device__ ::cuda::std::optional<knp::backends::gpu::cuda::SpikeMessage> calculate_population(
-            CUDAPopulation<knp::neuron_traits::BLIFATNeuron> &population,
-            const knp::backends::gpu::cuda::device_lib::CUDAVector<cuda::MessageVariant> &messages,
-            unsigned long long step_n);
+    device_lib::CUDAVector<SpikeIndex> calculate_population(
+            CUDAPopulation<knp::neuron_traits::BLIFATNeuron> &population, unsigned long long step);
 
-    static __device__ ::cuda::std::optional<knp::backends::gpu::cuda::SpikeMessage> calculate_population(
+    inline device_lib::CUDAVector<SpikeIndex> calculate_population(
             CUDAPopulation<knp::neuron_traits::SynapticResourceSTDPBLIFATNeuron> &population,
-            knp::backends::gpu::cuda::device_lib::CUDAVector<cuda::MessageVariant> &messages,
-            unsigned long long step_n);
+            unsigned long long step_n)
+    {
+        SPDLOG_ERROR("The calculate_population function is not implemented for synaptic resource STDP BLIFAT neuron");
+        return device_lib::CUDAVector<SpikeIndex>{};
+    }
 
 
     /**
