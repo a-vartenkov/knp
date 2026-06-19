@@ -107,6 +107,9 @@ __host__ void CUDAMessageBus::remove_receiver(const cuda::UID &receiver)
 // This is not threadsafe, make sure it's not run in parallel.
 __host__ __device__ void CUDAMessageBus::send_message(const cuda::MessageVariant &message)
 {
+#ifndef __CUDA_ARCH__
+    SPDLOG_DEBUG("Sending message of type {}", message.index());
+#endif
     messages_to_route_.push_back(message);
 }
 
@@ -136,16 +139,16 @@ __global__ void find_messages_kernel(const MessageVariant *messages, size_t mess
                               unsigned long long *indices, unsigned long long *counter)
 {
     unsigned long long i = blockIdx.x * blockDim.x + threadIdx.x;
-    // printf("Find message kernel, i %lu\n", i);
+    printf("Find message kernel, i %lu\n", i);
     if (i >= messages_size) return;
     if (subscription->is_my_message(messages[i]))
     {
         unsigned long long index = atomicAdd(counter, 1ull);
-        // printf("Found message: index %lu, message_index %lu\n", i, index);
+        printf("Found message: index %lu, message_index %lu\n", i, index);
         indices[index] = i;
     }
-    // else
-        // printf("No message found!\n");
+    else
+        printf("No message found!\n");
 }
 
 

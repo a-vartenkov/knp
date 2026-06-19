@@ -210,6 +210,74 @@ device_lib::CUDAVector<cuda::UID> get_uids_std(const std::vector<VectorData> &en
 }
 
 
+/// @note: out_messages_data should be of size to contain at least num_populations messages.
+//__global__ void calculate_populations_kernel(CUDABackendImpl::PopulationVariants *populations, size_t num_populations,
+//                                             const cuda::MessageVariant *messages, size_t messages_size,
+//                                             const cuda::device_lib::CUDAVector<unsigned long long> *indices,
+//                                             size_t indices_size,
+//                                             cuda::MessageVariant *out_messages_data, unsigned long long step)
+//{
+//    // Calculate populations. This is the same as inference.
+//    size_t thread_index = blockIdx.x * blockDim.x + threadIdx.x;
+//    if (thread_index >= num_populations) return;
+//
+//    CUDABackendImpl::PopulationVariants &population = populations[thread_index];
+//    knp::backends::gpu::cuda::device_lib::CUDAVector<cuda::MessageVariant> new_messages;
+//    PRINTF_TRACE("Population index: %lu\n", population.index());
+//
+//    size_t num_messages = indices[thread_index].size();
+//    PRINTF_TRACE("Num messages: %lu\n", num_messages);
+//    for (size_t n = 0; n < num_messages; ++n)
+//    {
+//        unsigned long long message_index = indices[thread_index][n];
+//        if (message_index >= messages_size) continue;
+//        PRINTF_TRACE("Population messages size: %lu, message index: %lu\n", messages_size,
+//                     message_index);
+//        new_messages.push_back(messages[message_index]);
+//    }
+//
+//    auto message = ::cuda::std::visit([&new_messages, step](auto &pop)
+//                                      {
+//                                          PRINTF_TRACE("Population messages size: %lu\n", new_messages.size());
+//                                          return CUDABackendImpl::calculate_population(pop, new_messages, step);
+//                                      }, population);
+//
+//    if (message) out_messages_data[thread_index] = cuda::MessageVariant{message.value()};
+//}
+
+
+// void CUDABackendImpl::calculate_populations(unsigned long long step)
+// {
+//    // Calculate populations. This is the same as inference.
+//    using MessageVector = device_lib::CUDAVector<cuda::MessageVariant>;
+//    if (!device_populations_.size()) return;
+//
+//    device_lib::CUDAVector<cuda::UID> population_uids = get_uids(device_populations_);
+//    auto [num_blocks, num_threads] = device_lib::get_blocks_config(device_populations_.size());
+//
+//    device_lib::CUDAVector<device_lib::CUDAVector<unsigned long long>> population_messages(device_populations_.size());
+//
+//    for (size_t i = 0; i < device_populations_.size(); ++i)
+//    {
+//        const device_lib::CUDAVector<unsigned long long> message_ids =
+//                device_message_bus_.unload_messages<SynapticImpactMessage>(
+//                    population_uids.copy_at(i));
+//        gpu_insert(message_ids, population_messages.data() + i);
+//    }
+//
+//    MessageVector out_messages(device_populations_.size());
+//    assert(device_populations_.size() == population_messages.size());
+//    calculate_populations_kernel<<<num_blocks, num_threads>>>(device_populations_.data(), device_populations_.size(),
+//                                                              device_message_bus_.all_messages().data(),
+//                                                              device_message_bus_.all_messages().size(),
+//                                                              population_messages.data(), population_messages.size(),
+//                                                              out_messages.data(), step);
+//    cudaDeviceSynchronize();
+//    SPDLOG_DEBUG("Sending {} spike messages.", out_messages.size());
+//    device_message_bus_.send_message_gpu_batch(out_messages);
+// }
+
+
 void CUDABackendImpl::calculate_projections(unsigned long long step)
 {
     // Calculate projections.
@@ -423,11 +491,16 @@ __global__ void calculate_neurons_impacts_all(device_lib::CUDAVectorMutableView<
     const cuda::MessageVariant &msg = messages_all.data_[current_message_id];
     assert(msg.index() == synaptic_impact_index);
 
-    auto [num_blocks, num_threads] = device_lib::get_blocks_config(message_ids.size_);
-    calculate_neurons_impacts<<<num_blocks, num_threads>>>(neurons,
-           ::cuda::std::get<synaptic_impact_index>(msg).impacts_.view());
-}
+    auto msg_size = ::cuda::std::get<synaptic_impact_index>(msg).impacts_.size();
 
+    auto [num_blocks, num_threads] = device_lib::get_blocks_config(msg_size);
+    if (num_threads != 0)
+    {
+        calculate_neurons_impacts<<<num_blocks, num_threads>>>(neurons,
+                                                               ::cuda::std::get<synaptic_impact_index>(
+                                                                       msg).impacts_.view());
+    }
+}
 
 __global__ void calculate_neurons_post_impact(device_lib::CUDAVectorMutableView<BlifatParams> neurons,
                                               SpikeIndex *spike_buffer, SpikeIndex *size_counter)
@@ -497,10 +570,17 @@ device_lib::CUDAVector<SpikeIndex> CUDABackendImpl::calculate_population(
     device_lib::CUDAVector<unsigned long long> message_ids
             = device_message_bus_.unload_messages<cuda::SynapticImpactMessage>(population.uid_);
 
-    auto [num_blocks_msg, num_threads_msg] = device_lib::get_blocks_config(message_ids.size());
-    calculate_neurons_impacts_all<<<num_blocks_msg, num_threads_msg>>>(population.neurons_.mut_view(),
-            device_message_bus_.get_all_messages_view(), message_ids.view());
-
+    if (!message_ids.empty())
+    {
+        SPDLOG_DEBUG("Running calculate impacts on {} messages", message_ids.size());
+        auto [num_blocks_msg, num_threads_msg] = device_lib::get_blocks_config(message_ids.size());
+        calculate_neurons_impacts_all<<<num_blocks_msg, num_threads_msg>>>(population.neurons_.mut_view(),
+                                                                           device_message_bus_.get_all_messages_view(),
+                                                                           message_ids.view());
+    }
+    else
+        SPDLOG_WARN("No synaptic impact messages found for population {}",
+                    ::std::string(to_cpu_uid(population.uid_)));
     SpikeIndex *output;
     cudaMalloc(&output, sizeof(SpikeIndex) * population.neurons_.size());
     SpikeIndex *counter;
@@ -528,7 +608,13 @@ void CUDABackendImpl::calculate_populations(unsigned long long step)
             if (!spikes.empty())
             {
                 cuda::SpikeMessage message{MessageHeader{pop.uid_, step, false}, std::move(spikes)};
-                device_message_bus_.send_message(std::move(message));
+                SPDLOG_DEBUG("Population {} created a message with {} spikes", std::string(to_cpu_uid(pop.uid_)),
+                             message.neuron_indexes_.size());
+                device_message_bus_.send_message(message);
+            }
+            else
+            {
+                SPDLOG_DEBUG("No spike messages were sent from population {}", ::std::string(to_cpu_uid(pop.uid_)));
             }
         }, population);
     }
