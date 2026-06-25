@@ -226,7 +226,7 @@ public:
         for (size_type i = 0; i < size_; ++i) Allocator::destroy(data_ + i);
         allocator_.deallocate(data_);
         #else
-        if (size_)
+        if (size_ && !std::is_trivially_destructible_v<value_type>)
         {
             auto [num_blocks, num_threads] = get_blocks_config(size_);
             destruct_kernel<T, Allocator><<<num_blocks, num_threads>>>(data_, size_);
@@ -589,7 +589,10 @@ public:
         FAST_ERROR_CHECK(typeid(T).name() + std::string(" Starting actualize: {}"));
         SPDLOG_TRACE("Actualizing vector of {}.", typeid(T).name());
         auto [num_blocks, num_threads] = get_blocks_config(size_);
-        copy_construct_kernel<<<num_blocks, num_threads>>>(data_, size_, source_data);
+        if (std::is_trivially_copyable_v<value_type>)
+            copy_kernel<<<num_blocks, num_threads>>>(data_, size_, source_data);
+        else
+            copy_construct_kernel<<<num_blocks, num_threads>>>(data_, size_, source_data);
         cudaDeviceSynchronize();
         FAST_ERROR_CHECK(typeid(T).name() + std::string(" Finish actualize: {}"));
         SPDLOG_TRACE("Done actualizing vector");
