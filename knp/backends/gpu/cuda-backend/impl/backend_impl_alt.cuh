@@ -49,7 +49,7 @@
 
 #include "projection.cuh"
 #include "population.cuh"
-#include "cuda_bus/message_bus.cuh"
+#include "cuda_bus/message_bus_alt.cuh"
 #include "cuda_lib/vector.cuh"
 
 
@@ -290,17 +290,17 @@ public:
      */
     __host__ void calculate_projection(
             CUDAProjection<knp::synapse_traits::DeltaSynapse> &projection,
-            const knp::backends::gpu::cuda::device_lib::CUDAVector<unsigned long long> &message_ids,
+            const std::vector<unsigned long long> &message_ids,
             unsigned long long step_n);
 
     __host__ void calculate_projection(
             CUDAProjection<knp::synapse_traits::AdditiveSTDPDeltaSynapse> &projection,
-            const knp::backends::gpu::cuda::device_lib::CUDAVector<unsigned long long> &message_ids,
+            const std::vector<unsigned long long> &message_ids,
             unsigned long long step_n);
 
     __host__ void calculate_projection(
             CUDAProjection<knp::synapse_traits::SynapticResourceSTDPDeltaSynapse> &projection,
-            const knp::backends::gpu::cuda::device_lib::CUDAVector<unsigned long long> &message_ids,
+            const std::vector<unsigned long long> &message_ids,
             unsigned long long step_n);
 
     void init();

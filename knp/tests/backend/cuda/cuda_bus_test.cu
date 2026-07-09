@@ -36,7 +36,7 @@
 #include "../../../backends/gpu/cuda-backend/impl/cuda_lib/register_type.cuh"
 #include "../../../backends/gpu/cuda-backend/impl/cuda_lib/safe_call.cuh"
 #include "../../../backends/gpu/cuda-backend/impl/cuda_lib/vector.cuh"
-#include "../../../backends/gpu/cuda-backend/impl/cuda_bus/message_bus.cuh"
+#include "../../../backends/gpu/cuda-backend/impl/cuda_bus/message_bus_alt.cuh"
 #include "../../../backends/gpu/cuda-backend/impl/cuda_bus/messaging.cuh"
 #include "../../../backends/gpu/cuda-backend/impl/uid.cuh"
 #include "../../../backends/gpu/cuda-backend/impl/projection.cuh"
@@ -149,7 +149,7 @@ TEST(CUDAMessagingSuite, AddReceiveBusMessage)
     std::vector<knp_cuda::UID> senders{msg.header_.sender_uid_};
     message_buses.gpu_.subscribe_gpu<SpikeMessage>(receiver_uid, {msg.header_.sender_uid_});
     EXPECT_EQ(message_buses.gpu_.unload_messages<SpikeMessage>(receiver_uid).size(), 0);
-    message_buses.gpu_.send_message(msg);
+    message_buses.gpu_.send_message(std::move(msg));
     EXPECT_EQ(message_buses.gpu_.unload_messages<SpikeMessage>(receiver_uid).size(), 1);
     EXPECT_EQ(message_buses.gpu_.unload_messages<knp_cuda::SynapticImpactMessage>(receiver_uid).size(), 0);
     EXPECT_EQ(message_buses.gpu_.unload_messages<SpikeMessage>(msg.header_.sender_uid_).size(), 0);
