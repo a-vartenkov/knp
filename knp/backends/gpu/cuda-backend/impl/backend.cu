@@ -118,6 +118,7 @@ void CUDABackend::_step()
     }
     SPDLOG_DEBUG("Message bus 1 {}", impl_->get_message_bus().get_num_messages<cuda::SpikeMessage>());
     impl_->get_message_bus().send_messages_to_host<cuda::SpikeMessage>(step);
+    impl_->get_message_bus().send_messages_to_host<cuda::SynapticImpactMessage>(step);
     SPDLOG_DEBUG("Message bus 2 {}", impl_->get_message_bus().get_num_messages<cuda::SpikeMessage>());
     get_message_bus().route_messages();
     SPDLOG_DEBUG("Message bus 3 {}", impl_->get_message_bus().get_num_messages<cuda::SpikeMessage>());
@@ -136,6 +137,7 @@ void CUDABackend::_step()
     impl_->calculate_projections(step);
     SPDLOG_DEBUG("Message bus 7 {}", impl_->get_message_bus().get_num_messages<cuda::SynapticImpactMessage>());
     impl_->get_message_bus().send_messages_to_host<cuda::SynapticImpactMessage>(step);
+    impl_->get_message_bus().send_messages_to_host<cuda::SpikeMessage>(step);
     SPDLOG_DEBUG("Message bus 8 {}", impl_->get_message_bus().get_num_messages<cuda::SynapticImpactMessage>());
     get_message_bus().route_messages();
     SPDLOG_DEBUG("Message bus 9 {}", impl_->get_message_bus().get_num_messages<cuda::SynapticImpactMessage>());
