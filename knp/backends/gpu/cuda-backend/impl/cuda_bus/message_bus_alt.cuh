@@ -88,6 +88,8 @@ struct MessageBuffer
         message_ids_.clear();
     }
 };
+
+
 /**
 * @brief The MessageBus class is a definition of an interface to a message bus.
 */
@@ -176,6 +178,12 @@ public:
         messages_impacts_.clear();
     }
 
+    template <class MessageType>
+    __host__ void clear()
+    {
+        get_message_buffer<MessageType>().clear();
+    }
+
     /**
      * @brief Copy host subscriptions here.
      */
@@ -229,7 +237,6 @@ public:
             std::memcpy(result.data() + res_size, id_buf.data(), id_buf.size() * sizeof(unsigned long long));
         }
         return result;
-
     }
 
     template <class MessageType>
@@ -269,10 +276,6 @@ private:
             subscriptions_.set(sub_index, sub_upd);
             return false;
         }
-        // TEMP
-        auto error = cudaGetLastError();
-        if (error != cudaSuccess) SPDLOG_ERROR("Already an error here: {}", error);
-        // END TEMP
         SPDLOG_DEBUG("Adding new gpu subscription");
         subscriptions_.push_back(Subscription(receiver, senders, type_index));
         SPDLOG_DEBUG("Done adding new gpu subscription");

@@ -210,74 +210,6 @@ device_lib::CUDAVector<cuda::UID> get_uids_std(const std::vector<VectorData> &en
 }
 
 
-/// @note: out_messages_data should be of size to contain at least num_populations messages.
-//__global__ void calculate_populations_kernel(CUDABackendImpl::PopulationVariants *populations, size_t num_populations,
-//                                             const cuda::MessageVariant *messages, size_t messages_size,
-//                                             const cuda::device_lib::CUDAVector<unsigned long long> *indices,
-//                                             size_t indices_size,
-//                                             cuda::MessageVariant *out_messages_data, unsigned long long step)
-//{
-//    // Calculate populations. This is the same as inference.
-//    size_t thread_index = blockIdx.x * blockDim.x + threadIdx.x;
-//    if (thread_index >= num_populations) return;
-//
-//    CUDABackendImpl::PopulationVariants &population = populations[thread_index];
-//    knp::backends::gpu::cuda::device_lib::CUDAVector<cuda::MessageVariant> new_messages;
-//    PRINTF_TRACE("Population index: %lu\n", population.index());
-//
-//    size_t num_messages = indices[thread_index].size();
-//    PRINTF_TRACE("Num messages: %lu\n", num_messages);
-//    for (size_t n = 0; n < num_messages; ++n)
-//    {
-//        unsigned long long message_index = indices[thread_index][n];
-//        if (message_index >= messages_size) continue;
-//        PRINTF_TRACE("Population messages size: %lu, message index: %lu\n", messages_size,
-//                     message_index);
-//        new_messages.push_back(messages[message_index]);
-//    }
-//
-//    auto message = ::cuda::std::visit([&new_messages, step](auto &pop)
-//                                      {
-//                                          PRINTF_TRACE("Population messages size: %lu\n", new_messages.size());
-//                                          return CUDABackendImpl::calculate_population(pop, new_messages, step);
-//                                      }, population);
-//
-//    if (message) out_messages_data[thread_index] = cuda::MessageVariant{message.value()};
-//}
-
-
-// void CUDABackendImpl::calculate_populations(unsigned long long step)
-// {
-//    // Calculate populations. This is the same as inference.
-//    using MessageVector = device_lib::CUDAVector<cuda::MessageVariant>;
-//    if (!device_populations_.size()) return;
-//
-//    device_lib::CUDAVector<cuda::UID> population_uids = get_uids(device_populations_);
-//    auto [num_blocks, num_threads] = device_lib::get_blocks_config(device_populations_.size());
-//
-//    device_lib::CUDAVector<device_lib::CUDAVector<unsigned long long>> population_messages(device_populations_.size());
-//
-//    for (size_t i = 0; i < device_populations_.size(); ++i)
-//    {
-//        const device_lib::CUDAVector<unsigned long long> message_ids =
-//                device_message_bus_.unload_messages<SynapticImpactMessage>(
-//                    population_uids.copy_at(i));
-//        gpu_insert(message_ids, population_messages.data() + i);
-//    }
-//
-//    MessageVector out_messages(device_populations_.size());
-//    assert(device_populations_.size() == population_messages.size());
-//    calculate_populations_kernel<<<num_blocks, num_threads>>>(device_populations_.data(), device_populations_.size(),
-//                                                              device_message_bus_.all_messages().data(),
-//                                                              device_message_bus_.all_messages().size(),
-//                                                              population_messages.data(), population_messages.size(),
-//                                                              out_messages.data(), step);
-//    cudaDeviceSynchronize();
-//    SPDLOG_DEBUG("Sending {} spike messages.", out_messages.size());
-//    device_message_bus_.send_message_gpu_batch(out_messages);
-// }
-
-
 void CUDABackendImpl::calculate_projections(unsigned long long step)
 {
     // Calculate projections.
@@ -614,6 +546,7 @@ device_lib::CUDAVector<SpikeIndex> CUDABackendImpl::calculate_population(
 
 void CUDABackendImpl::calculate_populations(unsigned long long step)
 {
+    // device_message_bus_.clear<SpikeMessage>();
     for (auto &population : device_populations_)
     {
         ::cuda::std::visit([this, step](auto &pop)
@@ -799,10 +732,11 @@ void CUDAProjection<knp::synapse_traits::DeltaSynapse>::form_message(
     auto iter = thrust::upper_bound(thrust::device, sending_steps_.begin(), sending_steps_.end(), current_step);
     if (iter == sending_steps_.begin())
     {
-        message_buf_.impacts_.clear();
+        // message_buf_.impacts_.clear();
         return;
     }
     unsigned long long num_impacts = iter - sending_steps_.begin();
+
     SynapticImpact *impacts;
     auto [num_blocks, num_threads] = device_lib::get_blocks_config(num_impacts);
     call_and_check(cudaMalloc(&impacts, sizeof(SynapticImpact) * num_impacts));
@@ -856,8 +790,8 @@ __host__ void CUDABackendImpl::calculate_projection(
     for (size_t i = 0; i < message_ids.size(); ++i)
     {
         unsigned long long msg_index = message_ids[i];
-        size_t data_size = messages[i].neuron_indexes_.size();
-        auto msg_data_pointer_cpu = messages[i].neuron_indexes_.data();
+        size_t data_size = messages[msg_index].neuron_indexes_.size();
+        auto msg_data_pointer_cpu = messages[msg_index].neuron_indexes_.data();
         SPDLOG_TRACE("Got message data: pointer {}, size {}", (void*)msg_data_pointer_cpu, data_size);
 
         if (data_size)
@@ -885,7 +819,6 @@ __host__ void CUDABackendImpl::calculate_projection(
             thrust::sort_by_key(thrust::device, delay_buffer, delay_buffer + impacts_count, impacts_buffer);
             projection.add_impacts(device_lib::CUDAVector<unsigned long long>{impacts_buffer, impacts_count},
                                    device_lib::CUDAVector<unsigned long long>{delay_buffer, impacts_count});
-
         }
         // Make messages
         projection.form_message(step_n);

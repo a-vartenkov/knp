@@ -20,6 +20,7 @@
  */
 
 #include "backend_impl_alt.cuh"
+#include "cuda_bus/message_bus_alt.cuh"
 #include "cuda_lib/fast_error_check.cuh"
 #include "cuda_lib/register_all.cuh"
 
@@ -111,39 +112,49 @@ constexpr bool is_forcing<knp::core::Projection<synapse_traits::DeltaSynapse>>()
 void CUDABackend::_step()
 {
     auto step = get_step();
+    cuda::CUDAMessageBus &bus = impl_->get_message_bus();
     SPDLOG_DEBUG("Starting step #{}...", step);
     if(!get_step())
     {
-        impl_->get_message_bus().sync_with_host();
+        bus.sync_with_host();
     }
-    SPDLOG_DEBUG("Message bus 1 {}", impl_->get_message_bus().get_num_messages<cuda::SpikeMessage>());
-    impl_->get_message_bus().send_messages_to_host<cuda::SpikeMessage>(step);
-    impl_->get_message_bus().send_messages_to_host<cuda::SynapticImpactMessage>(step);
-    SPDLOG_DEBUG("Message bus 2 {}", impl_->get_message_bus().get_num_messages<cuda::SpikeMessage>());
+    SPDLOG_DEBUG("Message bus 1 spikes {} impacts {}", bus.get_num_messages<cuda::SpikeMessage>(),
+                 bus.get_num_messages<cuda::SynapticImpactMessage>());
+    bus.send_messages_to_host<cuda::SpikeMessage>(step);
+    bus.send_messages_to_host<cuda::SynapticImpactMessage>(step);
+    SPDLOG_DEBUG("Message bus 2 spikes {} impacts {}", bus.get_num_messages<cuda::SpikeMessage>(),
+                 bus.get_num_messages<cuda::SynapticImpactMessage>());
     get_message_bus().route_messages();
-    SPDLOG_DEBUG("Message bus 3 {}", impl_->get_message_bus().get_num_messages<cuda::SpikeMessage>());
-    impl_->get_message_bus().receive_messages_from_host();
-    SPDLOG_DEBUG("Message bus 4 {}", impl_->get_message_bus().get_num_messages<cuda::SpikeMessage>());
-
+    SPDLOG_DEBUG("Message bus 3 spikes {} impacts {}", bus.get_num_messages<cuda::SpikeMessage>(),
+                 bus.get_num_messages<cuda::SynapticImpactMessage>());
+    bus.receive_messages_from_host();
+    SPDLOG_DEBUG("Message bus 4 spikes {} impacts {}", bus.get_num_messages<cuda::SpikeMessage>(),
+                 bus.get_num_messages<cuda::SynapticImpactMessage>());
 
     // Calculate populations. This is the same as inference.
     impl_->calculate_populations(step);
-    SPDLOG_DEBUG("Message bus 5 {}", impl_->get_message_bus().get_num_messages<cuda::SpikeMessage>());
+    SPDLOG_DEBUG("Message bus 5 spikes {} impacts {}", bus.get_num_messages<cuda::SpikeMessage>(),
+                 bus.get_num_messages<cuda::SynapticImpactMessage>());
     // impl_->route_population_messages(step);  // this is a part of calculate_populations
     get_message_bus().route_messages();
-    SPDLOG_DEBUG("Message bus 6 {}", impl_->get_message_bus().get_num_messages<cuda::SpikeMessage>());
+    SPDLOG_DEBUG("Message bus 6 spikes {} impacts {}", bus.get_num_messages<cuda::SpikeMessage>(),
+                 bus.get_num_messages<cuda::SynapticImpactMessage>());
     //
     // Calculate projections.
     impl_->calculate_projections(step);
-    SPDLOG_DEBUG("Message bus 7 {}", impl_->get_message_bus().get_num_messages<cuda::SynapticImpactMessage>());
-    impl_->get_message_bus().send_messages_to_host<cuda::SynapticImpactMessage>(step);
-    impl_->get_message_bus().send_messages_to_host<cuda::SpikeMessage>(step);
-    SPDLOG_DEBUG("Message bus 8 {}", impl_->get_message_bus().get_num_messages<cuda::SynapticImpactMessage>());
+    SPDLOG_DEBUG("Message bus 7 spikes {} impacts {}", bus.get_num_messages<cuda::SpikeMessage>(),
+                 bus.get_num_messages<cuda::SynapticImpactMessage>());
+    bus.send_messages_to_host<cuda::SynapticImpactMessage>(step);
+    bus.send_messages_to_host<cuda::SpikeMessage>(step);
+    SPDLOG_DEBUG("Message bus 8 spikes {} impacts {}", bus.get_num_messages<cuda::SpikeMessage>(),
+                 bus.get_num_messages<cuda::SynapticImpactMessage>());
     get_message_bus().route_messages();
-    SPDLOG_DEBUG("Message bus 9 {}", impl_->get_message_bus().get_num_messages<cuda::SynapticImpactMessage>());
+    SPDLOG_DEBUG("Message bus 9 spikes {} impacts {}", bus.get_num_messages<cuda::SpikeMessage>(),
+                 bus.get_num_messages<cuda::SynapticImpactMessage>());
     SPDLOG_DEBUG("Step {}", step);
     impl_->route_projection_messages(step);
-    SPDLOG_DEBUG("Message bus 10 {}", impl_->get_message_bus().get_num_messages<cuda::SynapticImpactMessage>());
+    SPDLOG_DEBUG("Message bus 10 spikes {} impacts {}", bus.get_num_messages<cuda::SpikeMessage>(),
+                 bus.get_num_messages<cuda::SynapticImpactMessage>());
     SPDLOG_DEBUG("Step finished #{}.", get_step());
 
     step = gad_step();

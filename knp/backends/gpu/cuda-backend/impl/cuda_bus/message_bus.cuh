@@ -233,10 +233,6 @@ private:
             subscriptions_.set(sub_index, sub_upd);
             return false;
         }
-        // TEMP
-        auto error = cudaGetLastError();
-        if (error != cudaSuccess) SPDLOG_ERROR("Already an error here: {}", error);
-        // END TEMP
         SPDLOG_DEBUG("Adding new gpu subscription");
         subscriptions_.push_back(Subscription(receiver, senders, type_index));
         SPDLOG_DEBUG("Done adding new gpu subscription");
