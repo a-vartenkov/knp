@@ -524,9 +524,6 @@ device_lib::CUDAVector<SpikeIndex> CUDABackendImpl::calculate_population(
                                       device_message_bus_.all_messages<SynapticImpactMessage>(),
                                       message_ids);
     }
-    else
-        SPDLOG_WARN("No synaptic impact messages found for population {}",
-                    ::std::string(to_cpu_uid(population.uid_)));
     SpikeIndex *output;
     cudaMalloc(&output, sizeof(SpikeIndex) * population.neurons_.size());
     SpikeIndex *counter;
@@ -581,12 +578,13 @@ __host__ unsigned long long CUDABackendImpl::route_projection_messages(unsigned 
                    if (proj.message_buf_.impacts_.size())
                    {
                        device_message_bus_.send_message(std::move(proj.message_buf_));
-                       cudaDeviceSynchronize();
+                       // cudaDeviceSynchronize();
                        proj.message_buf_.impacts_.clear();
                        ++sent_message_counter;
                    }
                }, device_projections_[i]);
     }
+    cudaDeviceSynchronize();
     SPDLOG_DEBUG("Projections sent {} messages", sent_message_counter);
     return sent_message_counter;
 }

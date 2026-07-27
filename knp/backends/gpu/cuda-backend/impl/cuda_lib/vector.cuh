@@ -471,7 +471,6 @@ public:
             copy_construct_kernel<T><<<num_blocks, num_threads>>>(new_data, size_, data_);
             SPDLOG_TRACE("Running destruct kernel with {} blocks and {} threads", num_blocks, num_threads);
             destruct_kernel<T, Allocator><<<num_blocks, num_threads>>>(data_, size_);
-            cudaDeviceSynchronize(); // TEMP
             FAST_ERROR_CHECK(typeid(T).name() + std::string(" Destruct kernel: {}"));
         }
         SPDLOG_TRACE("Data reserved, freeing old memory at {}", reinterpret_cast<const void*>(data_));
