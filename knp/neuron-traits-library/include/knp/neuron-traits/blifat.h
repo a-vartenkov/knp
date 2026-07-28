@@ -34,7 +34,9 @@ namespace knp::neuron_traits
 {
 
 /**
- * @brief BLIFAT neuron. Use as a template parameter only.
+ * @brief Type that represents a Bursting Leaky Integrate-and-Fire with Adaptive Threshold neuron.
+ * 
+ * @note This type is intended to be used only as a template argument. It does not contain any data members.
  */
 struct BLIFATNeuron;
 
@@ -63,7 +65,9 @@ struct default_values<BLIFATNeuron>
 
     /**
      * @brief The parameter defines a constant part of the threshold for membrane potential.
+     * 
      * @details After membrane potential reaches the threshold value, the neuron generates a spike.
+     * 
      * @note Current threshold value for membrane potential is composed from three parameters:
      * activation_threshold_, dynamic_threshold_, and additional_threshold_. 
      */
@@ -71,8 +75,10 @@ struct default_values<BLIFATNeuron>
 
     /**
      * @brief The parameter defines a dynamic part of the threshold for membrane potential.
+     * 
      * @details After neuron generates a spike, the `dynamic_threshold_` value increases by 
      * the `threshold_increment_` value.
+     * 
      * @note Current threshold value for membrane potential is composed from three parameters:
      * activation_threshold_, dynamic_threshold_, and additional_threshold_.
      */
@@ -80,7 +86,9 @@ struct default_values<BLIFATNeuron>
 
     /**
      * @brief The parameter defines an additional part of the threshold for membrane potential.
+     * 
      * @details The parameter is used for mechanisms that are implemented in specific neuron types.
+     * 
      * @note Current threshold value for membrane potential is composed from three parameters:
      * activation_threshold_, dynamic_threshold_, and additional_threshold_.
      */
@@ -105,6 +113,7 @@ struct default_values<BLIFATNeuron>
     /**
      * @brief The parameter defines a time constant during which the `postsynaptic_trace_` parameter tends to zero if
      * nothing happens.
+     * 
      * @details If `postsynaptic_trace_decay_` equals `0`, then `postsynaptic_trace_` also equals `0`.
      */
     constexpr static double postsynaptic_trace_decay_ = 0.;
@@ -132,6 +141,7 @@ struct default_values<BLIFATNeuron>
 
     /**
      * @brief This parameter is used if there was a blocking signal.
+     * 
      * @details If used, all potential changes due to synapses are ignored.
      */
     constexpr static double pre_impact_potential_ = 0;
@@ -148,6 +158,7 @@ struct default_values<BLIFATNeuron>
 
     /**
      * @brief The parameter defines a number of network steps after reaching which a neuron generates a spike.
+     * 
      * @details Value of 0 means that no bursting occurs.
      */
     constexpr static unsigned bursting_period_ = 0;
@@ -203,22 +214,28 @@ struct neuron_parameters<BLIFATNeuron>
 
     /**
      * @brief The parameter defines a constant part of the threshold for membrane potential.
+     * 
      * @details After membrane potential reaches the threshold value, the neuron generates a spike.
+     * 
      * @note Current threshold value for membrane potential is composed from three parameters:
      * activation_threshold_, dynamic_threshold_, and additional_threshold_. 
      */
     double activation_threshold_ = default_values<BLIFATNeuron>::activation_threshold_;
     /**
      * @brief The parameter defines an additional part of the threshold for membrane potential.
+     * 
      * @details The parameter is used for mechanisms that are implemented in specific neuron types.
+     * 
      * @note Current threshold value for membrane potential is composed from three parameters:
      * activation_threshold_, dynamic_threshold_, and additional_threshold_.
      */
     double additional_threshold_ = default_values<BLIFATNeuron>::additional_threshold_;
     /**
      * @brief The parameter defines a dynamic part of the threshold for membrane potential.
+     * 
      * @details After neuron generates a spike, the `dynamic_threshold_` value increases by 
      * the `threshold_increment_` value.
+     * 
      * @note Current threshold value for membrane potential is composed from three parameters:
      * activation_threshold_, dynamic_threshold_, and additional_threshold_.
      */
@@ -239,6 +256,7 @@ struct neuron_parameters<BLIFATNeuron>
     /**
      * @brief The parameter defines a time constant during which the `postsynaptic_trace_` parameter tends to zero if
      * nothing happens.
+     * 
      * @details If `postsynaptic_trace_decay_` equals `0`, then `postsynaptic_trace_` also equals `0`.
      */
     double postsynaptic_trace_decay_ = default_values<BLIFATNeuron>::postsynaptic_trace_decay_;
@@ -262,6 +280,7 @@ struct neuron_parameters<BLIFATNeuron>
     double potential_ = default_values<BLIFATNeuron>::potential_;
     /**
      * @brief This parameter is used if there was a blocking signal.
+     * 
      * @details If used, all potential changes due to synapses are ignored.
      */
     double pre_impact_potential_ = default_values<BLIFATNeuron>::pre_impact_potential_;
@@ -277,6 +296,7 @@ struct neuron_parameters<BLIFATNeuron>
 
     /**
      * @brief The parameter defines a number of network steps after reaching which a neuron generates a spike.
+     * 
      * @details Value of 0 means that no bursting occurs.
      */
     unsigned bursting_period_ = default_values<BLIFATNeuron>::bursting_period_;

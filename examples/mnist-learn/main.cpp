@@ -24,15 +24,22 @@
 #include "dataset.h"
 #include "evaluate_results.h"
 #include "inference.h"
+#include "network_validation.h"
 #include "parse_arguments.h"
 #include "save_network.h"
 #include "training.h"
 
 
 /**
- * @brief Run whole model.
- * @tparam Neuron Neuron type.
- * @param model_desc Model description.
+ * @brief Execute complete model pipeline for specified neuron type.
+ *
+ * @details This template function orchestrates the entire machine learning pipeline for neural networks, including
+ * dataset processing, network construction, training, inference, and evaluation. It serves as the core execution
+ * engine for both AltAI and BLIFAT neuron models.
+ *
+ * @tparam Neuron neuron type for neuron model specification.
+ *
+ * @param model_desc model description containing configuration parameters and paths.
  */
 template <typename Neuron>
 void run_model(const ModelDescription& model_desc)
@@ -76,32 +83,46 @@ void run_model(const ModelDescription& model_desc)
         throw std::runtime_error("Model leading path is not defined for inference-only mode");
     };
 
+
+    // Execute inference on test data.
     auto inference_spikes = infer_model<Neuron>(model_desc, dataset, network, backend_loader);
 
+    // Evaluate and report inference results.
     evaluate_results(inference_spikes, dataset);
 }
 
 
 /**
- * @brief Main function.
- * @param argc Argument count.
- * @param argv Arguments value.
- * @return Error code.
+ * @brief Main application entry point.
+ *
+ * @details This function serves as the primary execution point for the MNIST neural network learning application.
+ * It handles command-line argument parsing, configuration validation, user interaction, and routes execution to
+ * the appropriate neuron model.
+ *
+ * @param argc argument count.
+ * @param argv arguments values.
+ * 
+ * @return exit code.
  */
 int main(int argc, char** argv)
 {
-    // Parsing command line arguments.
+    // Parse command-line arguments and validate configuration.
     std::optional<ModelDescription> model_desc_opt = parse_arguments(argc, argv);
     if (!model_desc_opt.has_value()) return EXIT_FAILURE;
     const ModelDescription& model_desc = model_desc_opt.value();
 
-    std::cout << "Starting model:\n" << model_desc << std::endl;
+    // Display configuration to user for confirmation.
+    std::cout << "Model description:\n"
+              << model_desc << "\nPress ENTER to accept parameters and start model." << std::endl;
+    std::cin.get();
+    std::cout << "Starting model." << std::endl;
 
-    // Starting model according to selected type.
+    // Execute model according to selected neuron type.
     switch (model_desc.type_)
     {
         case SupportedModelType::BLIFAT:
         {
+            // cppcheck-suppress throwInEntryPoint
             run_model<knp::neuron_traits::BLIFATNeuron>(model_desc);
             break;
         }

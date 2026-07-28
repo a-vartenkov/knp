@@ -49,7 +49,8 @@ include(clang-tidy)
 include(knp-functions)
 
 find_package(CUDAToolkit REQUIRED)
-find_package(Boost ${KNP_BOOST_MIN_VERSION} COMPONENTS system filesystem REQUIRED)
+
+find_package(Boost ${KNP_BOOST_MIN_VERSION} COMPONENTS filesystem REQUIRED)
 
 file(GLOB_RECURSE ${PROJECT_NAME}_headers include/${${PROJECT_NAME}_PUBLIC_INCLUDE_DIR}/*.h)
 file(GLOB_RECURSE ${PROJECT_NAME}_cuda_headers include/${${PROJECT_NAME}_PUBLIC_INCLUDE_DIR}/*.cuh)
@@ -70,7 +71,7 @@ knp_add_library("${PROJECT_NAME}"
         ${${PROJECT_NAME}_cuda_headers}
     ALIAS KNP::Backends::CUDA
     LINK_PRIVATE
-        Boost::headers ${Boost_LIBRARIES} spdlog::spdlog_header_only CUDA::cudart CUDA::cuda_driver CUDA::nvml
+        Boost::headers spdlog::spdlog_header_only CUDA::cudart CUDA::cuda_driver CUDA::nvml
     LINK_PUBLIC
         KNP::Core
 )
@@ -110,9 +111,8 @@ if (KNP_INSTALL)
 
     knp_packaging_set_parameters("${COMPONENT_NAME}" "${PROJECT_NAME}"
             DESCRIPTION "${PROJECT_DESCRIPTION}"
-            DEPENDS "libboost-all-dev (>= ${Boost_VERSION})"
             DEPENDS "libzmq5"
-            DEPENDS "nvidia-cuda-toolkit-12-8 | cuda-toolkit-12-8"
+            DEPENDS "cuda-cudart-12-9 | cuda-runtime-12-9"
             PROVIDES "knp-backend")
 
     knp_packaging_set_parameters("${COMPONENT_NAME}-dev" "${PROJECT_NAME}"

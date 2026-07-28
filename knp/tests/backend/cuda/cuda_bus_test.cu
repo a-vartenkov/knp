@@ -136,7 +136,7 @@ TEST(CudaBackendSuite, BusSubscriptionsTest)
 }
 
 
-TEST(CUDAMessagingSuite, AddReceiveBusMessage)
+TEST(CudaMessagingSuite, AddReceiveBusMessage)
 {
     namespace knp_cuda = knp::backends::gpu::cuda;
     using SpikeMessage = knp_cuda::SpikeMessage;
