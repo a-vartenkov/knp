@@ -27,7 +27,6 @@
 #include <string>
 
 #include <boost/program_options.hpp>
-#include <spdlog/spdlog.h>
 
 
 namespace po = boost::program_options;
@@ -177,10 +176,6 @@ std::optional<ModelDescription> parse_arguments(int argc, char** argv)
 
     if (vm.count("inference_only"))
     {
-        if (model_desc.model_saving_path_.empty())
-        {
-            SPDLOG_ERROR("No model path specified for inference-only mode.");
-        }
         model_desc.inference_only_ = true;
     }
     else

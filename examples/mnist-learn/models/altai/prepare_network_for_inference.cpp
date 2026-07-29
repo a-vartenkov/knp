@@ -27,7 +27,7 @@
 
 
 // Replace WTA mechanisms with direct projection connections as the AltAI neuron model does not natively support WTA operations.
-static void replace_wta_with_projections(AnnotatedNetwork& network)
+void replace_wta_with_projections(AnnotatedNetwork& network)
 {
     for (const auto& wta_data : network.data_.wta_data_)
     {

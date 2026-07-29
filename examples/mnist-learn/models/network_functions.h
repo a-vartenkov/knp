@@ -108,4 +108,4 @@ std::function<knp::core::messaging::SpikeData(knp::core::Step)> make_training_la
  * @note We have to do this because AltAI does not support WTA.
  * @param network Annotated network.
  */
-static void replace_wta_with_projections(AnnotatedNetwork& network);
+void replace_wta_with_projections(AnnotatedNetwork& network);
