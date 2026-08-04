@@ -24,7 +24,7 @@
 #include "../../../backends/gpu/cuda-backend/impl/cuda_lib/extraction.cuh"
 #include "../../../backends/gpu/cuda-backend/impl/cuda_lib/safe_call.cuh"
 #include "../../../backends/gpu/cuda-backend/impl/cuda_lib/vector.cuh"
-#include "../../../backends/gpu/cuda-backend/impl/cuda_bus/message_bus_alt.cuh"
+#include "../../../backends/gpu/cuda-backend/impl/cuda_bus/message_bus.cuh"
 #include "../../../backends/gpu/cuda-backend/impl/cuda_bus/messaging.cuh"
 #include "../../../backends/gpu/cuda-backend/impl/uid.cuh"
 

@@ -16,7 +16,7 @@
 
 #include <algorithm>
 
-#include "backend_impl_alt.cuh"
+#include "backend_impl.cuh"
 #include "projection.cuh"
 #include "population.cuh"
 

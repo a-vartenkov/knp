@@ -19,8 +19,8 @@
  * limitations under the License.
  */
 
-#include "backend_impl_alt.cuh"
-#include "cuda_bus/message_bus_alt.cuh"
+#include "backend_impl.cuh"
+#include "cuda_bus/message_bus.cuh"
 #include "cuda_lib/fast_error_check.cuh"
 #include "cuda_lib/register_all.cuh"
 

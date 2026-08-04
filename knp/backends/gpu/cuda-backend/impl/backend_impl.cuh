@@ -1,5 +1,5 @@
 /**
- * @file backend_impl_alt.cuh
+ * @file backend_impl.cuh
  * @brief Class definition for CUDA GPU backend.
  * @kaspersky_support Artiom N.
  * @date 24.02.2025
@@ -49,7 +49,7 @@
 
 #include "projection.cuh"
 #include "population.cuh"
-#include "cuda_bus/message_bus_alt.cuh"
+#include "cuda_bus/message_bus.cuh"
 #include "cuda_lib/vector.cuh"
 
 

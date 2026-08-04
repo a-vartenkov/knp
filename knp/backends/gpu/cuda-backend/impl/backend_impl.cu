@@ -1,5 +1,5 @@
 /**
- * @file backend_impl_alt.cu
+ * @file backend_impl.cu
  * @brief CUDABackendImpl backend class implementation.
  * @kaspersky_support Artiom N.
  * @date 24.02.2025
@@ -34,7 +34,7 @@
 
 #include <algorithm>
 
-#include "backend_impl_alt.cuh"
+#include "backend_impl.cuh"
 #include "projection.cuh"
 #include "population.cuh"
 

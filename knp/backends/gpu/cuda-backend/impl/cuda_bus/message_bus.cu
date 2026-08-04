@@ -1,5 +1,5 @@
 /**
- * @file message_bus_alt.cu
+ * @file message_bus.cu
  * @brief Message bus implementation.
  * @kaspersky_support Vartenkov A.
  * @date 25.06.2026
@@ -26,7 +26,7 @@
 #include <cuda/std/detail/libcxx/include/algorithm>
 #include <thrust/device_ptr.h>
 #include <knp/meta/macro.h>
-#include "message_bus_alt.cuh"
+#include "message_bus.cuh"
 
 #include "../cuda_lib/vector.cuh"
 #include "../cuda_lib/register_all.cuh"
