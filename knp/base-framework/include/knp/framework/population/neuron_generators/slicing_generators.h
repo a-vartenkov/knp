@@ -1,5 +1,5 @@
 /**
- * @file slicing_neuron_generators.h
+ * @file slicing_generators.h
  * @brief Utilities that can be used for neuron population upcasting.
  * @kaspersky_support A. Vartenkov
  * @date 17.02.2026
