@@ -334,7 +334,8 @@ void Network::upcast_projections()
                     is_converted = true;
                     return core::AllProjectionsVariant{res};
                 }
-                return core::AllProjectionsVariant{proj};  // TODO: Remove unnecessary copying.
+                // TODO: Remove unnecessary copying.
+                return core::AllProjectionsVariant{proj};
             }, projection);
         if (is_converted)
         {
