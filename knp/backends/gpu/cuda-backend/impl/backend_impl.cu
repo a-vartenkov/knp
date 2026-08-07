@@ -736,18 +736,19 @@ __global__ void get_spike_message_data(device_lib::CUDAVectorView<cuda::MessageV
     {
         *size = 0;
         *data_pointer = nullptr;
-        printf("Pointer (no msg): %p, size: %lu\n", *data_pointer, *size);
+        PRINTF_DEBUG("Pointer (no msg): %p, size: %lu\n", *data_pointer, *size);
         return;
     }
     *data_pointer = ::cuda::std::get<cuda::SpikeMessage>(message_var).neuron_indexes_.data();
     *size = ::cuda::std::get<cuda::SpikeMessage>(message_var).neuron_indexes_.size();
-    // TODO TEMP
+#ifdef DEBUG
     printf("Pointer: %p, size: %lu\n", *data_pointer, *size);
     for (size_t i = 0; i < *size; ++i)
     {
         printf("%u ",  ::cuda::std::get<cuda::SpikeMessage>(message_var).neuron_indexes_.data()[i]);
     }
     printf("\n");
+#endif // DEBUG
 }
 
 
