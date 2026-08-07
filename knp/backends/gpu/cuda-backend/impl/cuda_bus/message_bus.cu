@@ -114,14 +114,14 @@ __host__ void CUDAMessageBus::remove_receiver(const cuda::UID &receiver)
 * @return
 */
 __global__ void find_messages_kernel(const MessageVariant *messages, size_t messages_size, Subscription *subscription,
-                                     unsigned long long *indices, unsigned long long *counter)
+                                     device_lib::LongIndex *indices, device_lib::LongIndex *counter)
 {
-    unsigned long long i = blockIdx.x * blockDim.x + threadIdx.x;
+    device_lib::LongIndex i = blockIdx.x * blockDim.x + threadIdx.x;
     printf("Find message kernel, i %lu\n", i);
     if (i >= messages_size) return;
     if (subscription->is_my_message(messages[i]))
     {
-        unsigned long long index = atomicAdd(counter, 1ull);
+        device_lib::LongIndex index = atomicAdd(counter, 1ull);
         printf("Found message: index %lu, message_index %lu\n", i, index);
         indices[index] = i;
     }
@@ -178,7 +178,7 @@ __host__ void CUDAMessageBus::subscribe_host(const cuda::UID &receiver, const st
 // We need to check that the messages we get from host were not previously sent there by GPU.
 __global__ void same_sender_kernel(cuda::UID uid, cuda::Subscription *subscriptions, size_t sub_size, bool *result)
 {
-    unsigned long long i = blockIdx.x * blockDim.x + threadIdx.x;
+    auto i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= sub_size) return;
     if (subscriptions[i].get_receiver_uid() == uid) *result = true;
 }
@@ -276,14 +276,6 @@ template
 __host__ bool cm::CUDAMessageBus::subscribe_both<SpikeMessage>(const cm::UID&, const std::vector<cuda::UID>&);
 template
 __host__ bool cm::CUDAMessageBus::subscribe_both<SynapticImpactMessage>(const cm::UID&, const std::vector<cuda::UID>&);
-
-//template
-//__host__ cm::device_lib::CUDAVector<unsigned long long> cm::CUDAMessageBus::unload_messages<SpikeMessage>(
-//        const cm::UID &receiver_uid);
-//
-//template
-//__host__ cm::device_lib::CUDAVector<unsigned long long> cm::CUDAMessageBus::unload_messages<SynapticImpactMessage>(
-//        const cm::UID &receiver_uid);
 
 
 #define INSTANCE_MESSAGES_FUNCTIONS(n, template_for_instance, message_type)                \

@@ -48,7 +48,7 @@ public:
     /**
      * @brief Index of the projection synapse.
      */
-    unsigned long long connection_index_;
+    device_lib::LongIndex connection_index_;
 
     /**
      * @brief Value used to change neuron membrane potential.

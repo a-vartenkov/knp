@@ -47,6 +47,8 @@
  */
 namespace knp::backends::gpu::cuda::device_lib
 {
+using LongIndex = unsigned long long;
+
 /**
  * @brief Plain Old Data structure for CUDAVector, used to pass into kernels.
  * @tparam T Value type for CUDAVector.
@@ -55,14 +57,14 @@ template <class T>
 struct CUDAVectorView
 {
     const T * const data_;
-    const unsigned long long size_;
+    const LongIndex size_;
 };
 
 template <class T>
 struct CUDAVectorMutableView
 {
     T * const data_;
-    const unsigned long long size_;
+    const LongIndex size_;
 };
 
 
@@ -72,7 +74,7 @@ class CUDAVector
 public:
     using value_type = T;
     using allocator_type = Allocator;
-    using size_type = unsigned long long;
+    using size_type = LongIndex;
     using difference_type = ptrdiff_t;
     using reference = T&;
     using const_reference = const T&;
@@ -168,7 +170,7 @@ public:
 
     CUDAVectorView<T> view(size_type begin, size_type end) const
     {
-        unsigned long long size_out = 0;
+        LongIndex size_out = 0;
         if (end > size_) end = size_;
         if (begin < end) size_out = end - begin;
         return {data_ + begin, size_out};
@@ -176,7 +178,7 @@ public:
 
     CUDAVectorMutableView<T> mut_view(size_type begin, size_type end)
     {
-        unsigned long long size_out = 0;
+        LongIndex size_out = 0;
         if (end > size_) end = size_;
         if (begin < end) size_out = end - begin;
         return {data_ + begin, size_out};
@@ -383,7 +385,7 @@ public:
         size_ = 0;
     }
 
-    __host__ __device__ bool set(unsigned long long index, const value_type &value)
+    __host__ __device__ bool set(LongIndex index, const value_type &value)
     {
         if (index >= size_) return false;
         #ifdef __CUDA_ARCH__

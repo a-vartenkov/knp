@@ -53,7 +53,7 @@ template <class Message>
 struct MessageBuffer
 {
     std::vector<Message> messages_; // Owning CPU container, calls destructors
-    std::unordered_map<knp::core::UID, std::vector<unsigned long long>, knp::core::uid_hash> message_ids_;
+    std::unordered_map<knp::core::UID, std::vector<device_lib::LongIndex>, knp::core::uid_hash> message_ids_;
 
     void add_message(Message &&message_to_add)
     {
@@ -65,7 +65,7 @@ struct MessageBuffer
         auto map_iter = message_ids_.find(uid);
         if (map_iter == message_ids_.end())
         {
-            message_ids_.insert(std::make_pair(uid, std::vector<unsigned long long>{messages_.size() - 1}));
+            message_ids_.insert(std::make_pair(uid, std::vector<device_lib::LongIndex>{messages_.size() - 1}));
         }
         else
         {
@@ -74,7 +74,7 @@ struct MessageBuffer
     }
 
 
-    [[nodiscard]] std::vector<unsigned long long> find_message_ids(const knp::core::UID &sender) const
+    [[nodiscard]] std::vector<device_lib::LongIndex> find_message_ids(const knp::core::UID &sender) const
     {
         auto iter = message_ids_.find(sender);
         if (iter == message_ids_.end())
@@ -222,19 +222,19 @@ public:
 
 
     template <class MessageType>
-    __host__ std::vector<unsigned long long> unload_messages(const cuda::UID &receiver_uid)
+    __host__ std::vector<device_lib::LongIndex> unload_messages(const cuda::UID &receiver_uid)
     {
         constexpr auto type_index = boost::mp11::mp_find<CUDAMessageVariant, MessageType>();
         size_t subscription_id = find_subscription(receiver_uid, type_index);
         Subscription sub = subscriptions_.copy_at(subscription_id);
-        std::vector<unsigned long long> result;
+        std::vector<device_lib::LongIndex> result;
         for (size_t i = 0; i < sub.get_senders().size(); ++i)
         {
             knp::core::UID uid = cuda::to_cpu_uid(sub.get_senders().copy_at(i));
             auto id_buf = get_message_buffer<MessageType>().find_message_ids(uid);
             auto res_size = result.size();
             result.resize(res_size + id_buf.size());
-            std::memcpy(result.data() + res_size, id_buf.data(), id_buf.size() * sizeof(unsigned long long));
+            std::memcpy(result.data() + res_size, id_buf.data(), id_buf.size() * sizeof(device_lib::LongIndex));
         }
         return result;
     }
@@ -296,7 +296,7 @@ private:
     __host__ size_t find_subscription(const cuda::UID &receiver, size_t type_id);
 
     template <typename MessageType>
-    __host__ __device__ ::cuda::std::vector<unsigned long long> find_messages(const Subscription &subscription);
+    __host__ __device__ ::cuda::std::vector<device_lib::LongIndex> find_messages(const Subscription &subscription);
 
     /**
      * @brief Container that stores all the subscriptions for the current endpoint.

@@ -65,6 +65,8 @@ namespace knp::backends::gpu::cuda
 class CUDABackendImpl
 {
 public:
+    using StepIndex = unsigned long long;
+
     /**
      * @brief List of neuron types supported by the single-threaded CPU backend.
      */
@@ -110,7 +112,7 @@ public:
     /**
      * @brief Map used for message construction. It maps a message to its future output step.
      */
-    using SynapticMessageQueue = std::unordered_map<unsigned long long, core::messaging::SynapticImpactMessage>;
+    using SynapticMessageQueue = std::unordered_map<StepIndex, core::messaging::SynapticImpactMessage>;
 
 public:
     /**
@@ -252,15 +254,13 @@ public:
         for (auto &proj : device_projections_) ::cuda::std::visit([](auto &entity) { entity.unlock_weights(); }, proj);
     }
 
-    // __host__ unsigned long long route_population_messages(unsigned long long step);
-
-    __host__ unsigned long long route_projection_messages(unsigned long long step);
+    __host__ uint64_t route_projection_messages(StepIndex step);
 
     // [[nodiscard]] DataRanges get_network_data() const { return {}; }
 
 public:
-    __host__ void calculate_populations(unsigned long long step);
-    __host__ void calculate_projections(unsigned long long step);
+    __host__ void calculate_populations(StepIndex step);
+    __host__ void calculate_projections(StepIndex step);
     __host__ knp::backends::gpu::cuda::CUDAMessageBus &get_message_bus() { return device_message_bus_; }
 
 public:
@@ -271,11 +271,11 @@ public:
      * @return set of spiked neuron indices.
      */
     device_lib::CUDAVector<SpikeIndex> calculate_population(
-            CUDAPopulation<knp::neuron_traits::BLIFATNeuron> &population, unsigned long long step);
+            CUDAPopulation<knp::neuron_traits::BLIFATNeuron> &population, StepIndex step);
 
     inline device_lib::CUDAVector<SpikeIndex> calculate_population(
             CUDAPopulation<knp::neuron_traits::SynapticResourceSTDPBLIFATNeuron> &population,
-            unsigned long long step_n)
+            StepIndex step_n)
     {
         SPDLOG_ERROR("The calculate_population function is not implemented for synaptic resource STDP BLIFAT neuron");
         return device_lib::CUDAVector<SpikeIndex>{};
@@ -290,18 +290,18 @@ public:
      */
     __host__ void calculate_projection(
             CUDAProjection<knp::synapse_traits::DeltaSynapse> &projection,
-            const std::vector<unsigned long long> &message_ids,
-            unsigned long long step_n);
+            const std::vector<device_lib::LongIndex> &message_ids,
+            StepIndex step_n);
 
     __host__ void calculate_projection(
             CUDAProjection<knp::synapse_traits::AdditiveSTDPDeltaSynapse> &projection,
-            const std::vector<unsigned long long> &message_ids,
-            unsigned long long step_n);
+            const std::vector<device_lib::LongIndex> &message_ids,
+            StepIndex step_n);
 
     __host__ void calculate_projection(
             CUDAProjection<knp::synapse_traits::SynapticResourceSTDPDeltaSynapse> &projection,
-            const std::vector<unsigned long long> &message_ids,
-            unsigned long long step_n);
+            const std::vector<device_lib::LongIndex> &message_ids,
+            StepIndex step_n);
 
     void init();
 

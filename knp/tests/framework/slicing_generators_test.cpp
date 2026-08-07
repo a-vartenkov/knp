@@ -3,7 +3,7 @@
 //
 #include <knp/synapse-traits/all_traits.h>
 #include <knp/framework/population/neuron_generators/slicing_generators.h>
-#include <knp/framework/projection/parameter_generators/synapse_slicing_generators.h>
+#include <knp/framework/projection/synapse_generators/synapse_slicing_generators.h>
 #include <knp/core/projection.h>
 
 
