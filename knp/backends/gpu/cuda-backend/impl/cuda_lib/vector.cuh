@@ -198,29 +198,6 @@ public:
         #endif
     }
 
-//    // Copy constructor from a cpu pointer-based array.
-//    __host__ __device__ CUDAVector<T, Allocator> from_cpu(const value_type *vec, size_type size)
-//    {
-//        reserve(size);
-//        size_ = size;
-//        #ifdef __CUDA_ARCH__
-//        for (size_type i = 0; i < size_; ++i) allocator_.construct(data_ + i, *(vec + i));
-//        #else
-//        if constexpr (std::is_trivially_copyable_v<value_type>)
-//        {
-//            call_and_check(cudaMemcpy(data_, vec, size * sizeof(value_type), cudaMemcpyHostToDevice));
-//        }
-//        else
-//        {
-//            for (size_t i = 0; i < size; ++i)
-//            {
-//                gpu_insert(vec[i], data_ + i); // TODO Parallelize
-//            }
-//        }
-//        #endif
-//
-//    }
-
     __host__ __device__ ~CUDAVector()
     {
         if (!data_ || !capacity_) return;
@@ -438,14 +415,8 @@ public:
         Allocator::construct(data_ + size_, value);
         ++size_;
     #else
-//        cudaDeviceSynchronize(); // TEMP
-//        FAST_ERROR_CHECK(typeid(T).name() + std::string(" Push back, reserve: {}"));
         resize(size_ + 1);
-//        cudaDeviceSynchronize(); // TEMP
-//        FAST_ERROR_CHECK(typeid(T).name() + std::string(" Push back, resize: {}"));
         set(size_ - 1, value);
-//        cudaDeviceSynchronize(); // TEMP
-//        FAST_ERROR_CHECK(typeid(T).name() + std::string(" Push back, set: {}"));
     #endif
     }
 
@@ -666,7 +637,4 @@ __host__ device_lib::CUDAVector<T, Allocator> gpu_extract<device_lib::CUDAVector
 
     return result;
 }
-
-
-
 } // namespace knp::backends::gpu::cuda
