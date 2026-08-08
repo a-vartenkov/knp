@@ -552,10 +552,10 @@ public:
         T* source_data = data_;
         data_ = allocator_.allocate(capacity_);
     #ifdef __CUDA_ARCH__ // Device only:
-        // PRINTF_TRACE("Device vector actualize\n");
+        PRINTF_DEBUG("Device vector actualize\n");
         for (size_t i = 0; i < size_; ++i)
             new (data_ + i) T(*(source_data + i));
-        // PRINTF_TRACE("End device vector actualize\n");
+        PRINTF_DEBUG("End device vector actualize\n");
 
     #else // Host only:
         FAST_ERROR_CHECK(typeid(T).name() + std::string(" Starting actualize: {}"));

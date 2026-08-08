@@ -44,8 +44,6 @@ namespace knp::backends::gpu
 CUDABackend::CUDABackend() : impl_(std::make_unique<cuda::CUDABackendImpl>(get_message_endpoint()))
 {
     SPDLOG_INFO("CUDA backend instance created.");
-    // size_t new_heap = 128 * 1024 * 1024; // 128 Mb // TEMP!
-    // cudaDeviceSetLimit(cudaLimitMallocHeapSize, new_heap);
 }
 
 

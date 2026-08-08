@@ -189,10 +189,7 @@ __host__ bool same_sender(const knp::core::messaging::MessageVariant &message,
 {
     if (subs.size() == 0) return false;
 
-    knp::core::UID sender_uid = std::visit([](const auto &msg)
-                                           {
-                                               return msg.header_.sender_uid_;
-                                           }, message);
+    knp::core::UID sender_uid = std::visit([](const auto &msg) { return msg.header_.sender_uid_; }, message);
 
     cuda::UID gpu_uid = to_gpu_uid(sender_uid);
     bool result = false;
@@ -281,8 +278,7 @@ __host__ bool cm::CUDAMessageBus::subscribe_both<SynapticImpactMessage>(const cm
 #define INSTANCE_MESSAGES_FUNCTIONS(n, template_for_instance, message_type)                \
     template bool CUDAMessageBus::unsubscribe<cm::message_type>(const cuda::UID &receiver);
 
-    BOOST_PP_SEQ_FOR_EACH(INSTANCE_MESSAGES_FUNCTIONS, "", BOOST_PP_VARIADIC_TO_SEQ(ALL_CUDA_MESSAGES))
-
+BOOST_PP_SEQ_FOR_EACH(INSTANCE_MESSAGES_FUNCTIONS, "", BOOST_PP_VARIADIC_TO_SEQ(ALL_CUDA_MESSAGES))
 
 }  // namespace knp::backends::gpu::cuda
 
