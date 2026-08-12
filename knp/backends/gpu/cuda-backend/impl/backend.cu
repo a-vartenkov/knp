@@ -176,9 +176,9 @@ void CUDABackend::start_learning()
 void CUDABackend::load_populations(const std::vector<PopulationVariants> &populations)
 {
     SPDLOG_DEBUG("Loading populations [{}]...", populations.size());
-    FAST_ERROR_CHECK("Loading populations already with an error: {}");
+    CUDA_FAST_ERROR_CHECK("Loading populations already with an error: {}");
     impl_->load_populations(populations);
-    FAST_ERROR_CHECK("An error occured during population loading: {}");
+    CUDA_FAST_ERROR_CHECK("An error occured during population loading: {}");
     SPDLOG_DEBUG("All populations loaded.");
 }
 
@@ -188,9 +188,9 @@ void CUDABackend::load_projections(const std::vector<ProjectionVariants> &projec
     SPDLOG_DEBUG("Loading projections [{}]...", projections.size());
 
     //    projections_ = projections;
-    FAST_ERROR_CHECK("Running projections with error: {}");
+    CUDA_FAST_ERROR_CHECK("Running projections with error: {}");
     impl_->load_projections(projections);
-    FAST_ERROR_CHECK("Loaded projections with error: {}");
+    CUDA_FAST_ERROR_CHECK("Loaded projections with error: {}");
     SPDLOG_DEBUG("All projections loaded.");
 }
 
@@ -198,9 +198,9 @@ void CUDABackend::load_projections(const std::vector<ProjectionVariants> &projec
 void CUDABackend::load_all_projections(const std::vector<knp::core::AllProjectionsVariant> &projections)
 {
     SPDLOG_DEBUG("Loading projections [{}]...", projections.size());
-    FAST_ERROR_CHECK("1 {}");
+    CUDA_FAST_ERROR_CHECK("1 {}");
     knp::meta::load_from_container<SupportedProjections>(projections, projections_);
-    FAST_ERROR_CHECK("2 {}");
+    CUDA_FAST_ERROR_CHECK("2 {}");
     load_projections(projections_);
     SPDLOG_DEBUG("All projections loaded.");
 }
@@ -209,11 +209,11 @@ void CUDABackend::load_all_projections(const std::vector<knp::core::AllProjectio
 void CUDABackend::load_all_populations(const std::vector<knp::core::AllPopulationsVariant> &populations)
 {
     SPDLOG_DEBUG("Loading populations [{}]...", populations.size());
-    FAST_ERROR_CHECK("2 {}");
+    CUDA_FAST_ERROR_CHECK("2 {}");
     knp::meta::load_from_container<SupportedPopulations>(populations, populations_);
-    FAST_ERROR_CHECK("22 {}");
+    CUDA_FAST_ERROR_CHECK("22 {}");
     load_populations(populations_);
-    FAST_ERROR_CHECK("222 {}");
+    CUDA_FAST_ERROR_CHECK("222 {}");
     SPDLOG_DEBUG("All populations loaded.");
 }
 

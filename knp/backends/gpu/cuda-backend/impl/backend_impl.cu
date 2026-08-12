@@ -260,11 +260,11 @@ void CUDABackendImpl::load_populations(const knp::backends::gpu::CUDABackend::Po
 void CUDABackendImpl::load_projections(const knp::backends::gpu::CUDABackend::ProjectionContainer &projections)
 {
     SPDLOG_DEBUG("Loading projections [{}]...", projections.size());
-    FAST_ERROR_CHECK("Starting to load, already an error: {}");
+    CUDA_FAST_ERROR_CHECK("Starting to load, already an error: {}");
     device_projections_.clear();
-    FAST_ERROR_CHECK("Cleared device projections: {}");
+    CUDA_FAST_ERROR_CHECK("Cleared device projections: {}");
     device_projections_.reserve(projections.size());
-    FAST_ERROR_CHECK("Reserving device projections: {}");
+    CUDA_FAST_ERROR_CHECK("Reserving device projections: {}");
 
     for (const auto &projection : projections)
     {
@@ -278,7 +278,7 @@ void CUDABackendImpl::load_projections(const knp::backends::gpu::CUDABackend::Pr
                          reinterpret_cast<void *>(device_projections_.data()),
                          device_projections_.capacity());
                          device_projections_.push_back(proj);
-            FAST_ERROR_CHECK("Pushed back {}");
+            CUDA_FAST_ERROR_CHECK("Pushed back {}");
             SPDLOG_DEBUG("Pushed back: size after: {}, pointer after: {}, capacity {}", device_projections_.size(),
                              reinterpret_cast<void *>(device_projections_.data()), device_projections_.capacity());
 
