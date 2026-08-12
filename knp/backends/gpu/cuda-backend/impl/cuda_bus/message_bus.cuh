@@ -156,12 +156,6 @@ public:
      */
     __host__ void remove_receiver(const cuda::UID &receiver);
 
-//    /**
-//     * @brief Send a message to the message bus.
-//     * @param message message to send.
-//     */
-//     template <class MessageType>
-//    __host__ __device__ void send_message(const MessageType &message);
 
     template <class MessageType>
     __host__ void send_message(MessageType &&message)

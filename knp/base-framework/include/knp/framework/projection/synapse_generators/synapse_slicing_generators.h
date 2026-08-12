@@ -23,8 +23,18 @@
 #include <knp/synapse-traits/all_traits.h>
 
 
+/**
+ * @brief Namespace for synapse generators.
+ */
 namespace knp::framework::projection::synapse_generators
 {
+/**
+ * @brief Convert a derived synapse parameters type to its parent.
+ * @tparam BaseSynapse base synapse type.
+ * @tparam DerivedSynapse derived synapse type.
+ * @param input_synapse_params the parameters to be converted.
+ * @return  the resulting parameters.
+ */
 template <class BaseSynapse, class DerivedSynapse>
 constexpr synapse_traits::synapse_parameters<BaseSynapse> slice_synapse(
         const synapse_traits::synapse_parameters<DerivedSynapse> &input_synapse_params)
@@ -38,6 +48,13 @@ constexpr synapse_traits::synapse_parameters<BaseSynapse> slice_synapse(
 }
 
 
+/**
+ * @brief Create the generator to convert synapses of a derived type to the base one.
+ * @tparam BaseSynapse base synapse type.
+ * @tparam DerivedSynapse derived synapse type.
+ * @param projection the derived type projection that is converted with the generator.
+ * @return a generator to convert synapses of the projection into the new ones.
+ */
 template <class BaseSynapse, class DerivedSynapse>
 typename core::Projection<BaseSynapse>::SynapseGenerator make_slicing_synapse_generator(
         const core::Projection<DerivedSynapse> &projection)
@@ -55,6 +72,13 @@ typename core::Projection<BaseSynapse>::SynapseGenerator make_slicing_synapse_ge
 }
 
 
+/**
+ * @brief Converts a projection of the derived synapse type to its parent synapse type.
+ * @tparam BaseSynapse parent synapse type.
+ * @tparam DerivedSynapse derived synapse type.
+ * @param derived_projection the original projection.
+ * @return the converted projection.
+ */
 template <class BaseSynapse, class DerivedSynapse>
 core::Projection<BaseSynapse> upcast_projection(const core::Projection<DerivedSynapse> &derived_projection)
 {
