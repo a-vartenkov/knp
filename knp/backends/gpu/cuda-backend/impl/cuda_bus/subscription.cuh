@@ -86,14 +86,6 @@ public:
         }
     }
 
-//    /**
-//     * @brief Copy constructor.
-//     * @param other other instance of Subscription.
-//     */
-//    __host__ __device__ Subscription(const Subscription &other)
-//        : receiver_(other.receiver_), senders_(other.senders_), type_index_(other.type_index_)
-//    {}
-
     /**
      * @brief Subscription constructor.
      * @param receiver receiver UID.
