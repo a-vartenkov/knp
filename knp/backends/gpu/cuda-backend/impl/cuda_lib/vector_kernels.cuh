@@ -1,6 +1,6 @@
 /**
  * @file vector_kernels.cuh
- * @brief CUDA STL-like vector implemented to work on GPU.
+ * @brief CUDA STL-like vector implemented to work on GPU. Kernels for its operations.
  * @kaspersky_support A. Vartenkov.
  * @date 06.07.2025
  * @license Apache 2.0

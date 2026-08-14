@@ -1,6 +1,6 @@
 /**
  * @file register_all.cuh
- * @brief Functions for GPU-host exchange of nontrivial types.
+ * @brief Macro for all types vector registration.
  * @kaspersky_support A. Vartenkov.
  * @date 06.04.2026
  * @license Apache 2.0

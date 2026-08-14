@@ -40,6 +40,7 @@
 #include "fast_error_check.cuh"
 #include "printf.cuh"
 #include "vector_kernels.cuh"
+#include "vector_view.cuh"
 
 
 /**
@@ -50,24 +51,10 @@ namespace knp::backends::gpu::cuda::device_lib
 using LongIndex = unsigned long long;
 
 /**
- * @brief Plain Old Data structure for CUDAVector, used to pass into kernels.
- * @tparam T Value type for CUDAVector.
+ * @brief STL-like vector with GPU storage.
+ * @tparam T Data type.
+ * @tparam Allocator Allocator type.
  */
-template <class T>
-struct CUDAVectorView
-{
-    const T * const data_;
-    const LongIndex size_;
-};
-
-template <class T>
-struct CUDAVectorMutableView
-{
-    T * const data_;
-    const LongIndex size_;
-};
-
-
 template <typename T, typename Allocator = CuMallocAllocator<T>>
 class CUDAVector
 {

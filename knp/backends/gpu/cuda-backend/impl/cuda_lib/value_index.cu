@@ -1,7 +1,7 @@
 /**
  * @file value_index.cu
- * @brief CUDABackend backend class implementation.
- * @kaspersky_support Artiom N.
+ * @brief Implementation for a helper structure used for searching.
+ * @kaspersky_support A. Vartenkov
  * @date 15.05.2026
  * @license Apache 2.0
  * @copyright © 2026 AO Kaspersky Lab

@@ -1,6 +1,6 @@
 /**
  * @file fast_error_check.cuh
- * @brief Functions for GPU-host exchange of nontrivial types.
+ * @brief Macro for testing the code for GPU errors.
  * @kaspersky_support A. Vartenkov.
  * @date 02.04.2026
  * @license Apache 2.0
