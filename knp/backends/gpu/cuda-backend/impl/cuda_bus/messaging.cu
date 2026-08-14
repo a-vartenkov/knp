@@ -41,6 +41,25 @@ MessageVariant extract_message_by_index(const void *msg_ptr)
 }
 
 
+template<size_t Index>
+inline void extract_dispatch(MessageVariant &result, size_t type, const void *msg_ptr)
+{
+    if (Index - 1 == type)
+    {
+        result = extract_message_by_index<Index - 1>(msg_ptr);
+        return;
+    }
+    if constexpr (Index == 1)
+    {
+        throw std::runtime_error("Wrong message type index when extracting");
+    }
+    else
+    {
+        extract_dispatch<Index - 1>(result, type, msg_ptr);
+    }
+}
+
+
 template<>
 MessageVariant gpu_extract<MessageVariant>(const MessageVariant *message)
 {
@@ -60,13 +79,7 @@ MessageVariant gpu_extract<MessageVariant>(const MessageVariant *message)
     call_and_check(cudaFree(msg_gpu));
     // Here we have a type index and a gpu pointer to message.
     MessageVariant result;
-    // TODO: Remove crunchs.
-    static_assert(::cuda::std::variant_size<cuda::MessageVariant>() == 2, "Add a case statement here!");
-    switch(type)
-    {
-        case 0: result = extract_message_by_index<0>(msg_ptr); break;
-        case 1: result = extract_message_by_index<1>(msg_ptr); break;
-    }
+    extract_dispatch<::cuda::std::variant_size_v<cuda::MessageVariant>>(result, type, msg_ptr);
     return result;
 }
 

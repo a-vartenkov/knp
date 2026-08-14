@@ -1,19 +1,49 @@
-//
-// Created by vartenkov on 15.05.26.
-//
+/**
+ * @file value_index.cu
+ * @brief CUDABackend backend class implementation.
+ * @kaspersky_support Artiom N.
+ * @date 15.05.2026
+ * @license Apache 2.0
+ * @copyright © 2026 AO Kaspersky Lab
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include "value_index.cuh"
 
 #include <thrust/transform.h>
 
+
 namespace knp::backends::gpu::cuda::device_lib
 {
-// TODO maybe parallelize
+__global__ void summarize_index_kernel(IndexView index, device_lib::CUDAVectorView<cuda::SpikeIndex> senders,
+                                       LongIndex *result)
+{
+    LongIndex thread_id = blockIdx.x * blockDim.x + threadIdx.x;
+    LongIndex value = 0;
+    if (index.offsets_size_ != 0 && thread_id < index.offsets_size_ - 1)
+    {
+        value = index.offsets_ptr_[thread_id + 1] - index.offsets_ptr_[thread_id];
+    }
+    else return;
+    atomicAdd(result, value);
+}
 
 /**
  * @brief Calculates the total number of values for all impulses.
  * @param index The built value index
  * @param inputs the impulses to be use
- * @return
+ * @return the number.
  */
 __host__ LongIndex count_values_by_indexes(const ValueIndex &index,
                                                     const CUDAVectorView<cuda::SpikeIndex> inputs)
@@ -57,19 +87,5 @@ __host__ CUDAVector<LongIndex> calculate_neuron_scan(const ValueIndex &index,
     // in-place prefix sum, for each neuron the value is the number of synapses before this, starts with 0.
     thrust::exclusive_scan(thrust::device, buffer, buffer + inputs.size_, buffer);
     return CUDAVector<LongIndex>{buffer, inputs.size_}; // The vector would take care of releasing
-}
-
-
-__global__ void summarize_index_kernel(IndexView index, device_lib::CUDAVectorView<cuda::SpikeIndex> senders,
-                                       LongIndex *result)
-{
-    LongIndex thread_id = blockIdx.x * blockDim.x + threadIdx.x;
-    LongIndex value = 0;
-    if (index.offsets_size_ != 0 && thread_id < index.offsets_size_ - 1)
-    {
-        value = index.offsets_ptr_[thread_id + 1] - index.offsets_ptr_[thread_id];
-    }
-    else return;
-    atomicAdd(result, value);
 }
 } // namespace knp::backends::gpu::cuda::device_lib

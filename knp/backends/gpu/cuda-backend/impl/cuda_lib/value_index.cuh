@@ -1,6 +1,23 @@
-//
-// Created by vartenkov on 29.04.26.
-//
+/**
+ * @file value_index.cuh
+ * @brief CUDABackend backend class implementation.
+ * @kaspersky_support Artiom N.
+ * @date 29.04.2026
+ * @license Apache 2.0
+ * @copyright © 2025 AO Kaspersky Lab
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 #pragma once
 #include <knp/core/projection.h>
@@ -13,11 +30,17 @@
 #include "../cuda_bus/messaging.cuh"
 
 
+/**
+ * @brief namespace for CUDA functions implementations.
+ */
 namespace knp::backends::gpu::cuda::device_lib
 {
 
 using LongIndex = unsigned long long;
 
+/**
+ * @brief Plain Old Data view structure for a ValueIndex object.
+ */
 struct IndexView
 {
     const LongIndex *indices_ptr_;
@@ -27,28 +50,53 @@ struct IndexView
 };
 
 
+/**
+ * @brief Structure to store indexes and offsets.
+ * @note it's used to find the connected synapses by a neuron index. You find the offset by indexing the offsets with a
+ * neuron's index, and then the number of synapses by difference between this offset and the following one. The part of
+ * the indices vector between those offsets gives you the indexes of the connected synapses.
+ */
 struct ValueIndex
 {
     device_lib::CUDAVector<LongIndex> indices_;
     device_lib::CUDAVector<LongIndex> offsets_;
 
+    /**
+     * @brief Construct a POD view.
+     * @return POD structure that can then be sent to __global__ functions easily.
+     */
     __host__ __device__ IndexView view() const
     {
         return {indices_.data(), indices_.size(), offsets_.data(), offsets_.size()};
     }
 
+    /**
+     * @brief Add a new synapse to an existing index.
+     * @param sender connected neuron.
+     * @param index synapse index.
+     * @note not implemented yet.
+     */
     void insert(LongIndex sender, LongIndex index)
     {
         throw std::logic_error("Not implemented");
         // TODO Add insert
     }
 
+    /**
+     * @brief Add a new synapse to an existing index.
+     * @param sender connected neuron.
+     * @param index synapse index.
+     * @note not implemented yet.
+     */
     void remove(LongIndex sender, LongIndex index)
     {
         throw std::logic_error("Not implemented");
         // TODO Add remove
     }
 
+    /**
+     * @brief actualize function, used to turn a shallow copy to a deep copy. See vector.cuh.
+     */
     __host__ __device__ void actualize()
     {
         indices_.actualize();
@@ -56,19 +104,11 @@ struct ValueIndex
     }
 };
 
-
-// TODO maybe parallelize
-template <class SynapseType>
-__host__ ValueIndex build_index(const knp::core::Projection<SynapseType> &cpu_projection);
-
-__global__ void summarize_index_kernel(IndexView index, device_lib::CUDAVectorView<cuda::SpikeIndex> senders,
-                                       LongIndex *result);
-
 /**
  * @brief Calculates the total number of values for all impulses.
- * @param index The built value index
- * @param inputs the impulses to be use
- * @return
+ * @param index The built value index.
+ * @param inputs the impulses to be use.
+ * @return total number of values for the inputs.
  */
 __host__ LongIndex count_values_by_indexes(const ValueIndex &index, const CUDAVectorView<cuda::SpikeIndex> inputs);
 

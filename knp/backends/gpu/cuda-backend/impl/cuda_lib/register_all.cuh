@@ -1,6 +1,3 @@
-//
-// Created by vartenkov on 06.04.26.
-//
 /**
  * @file register_all.cuh
  * @brief Functions for GPU-host exchange of nontrivial types.
