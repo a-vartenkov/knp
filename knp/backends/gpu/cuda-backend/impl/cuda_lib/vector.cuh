@@ -176,22 +176,22 @@ public:
     {
         if (!size_) return;
         data_ = allocator_.allocate(capacity_);
-        #ifdef __CUDA_ARCH__
+#ifdef __CUDA_ARCH__
         for (size_type i = 0; i < size_; ++i) Allocator::construct(data_ + i);
-        #else
+#else
         auto [num_blocks, num_threads] = get_blocks_config(size_);
         construct_kernel<T, Allocator><<<num_blocks, num_threads>>>(data_, size_);
         cudaDeviceSynchronize();
-        #endif
+#endif
     }
 
     __host__ __device__ ~CUDAVector()
     {
         if (!data_ || !capacity_) return;
-        #ifdef __CUDA_ARCH__
+#ifdef __CUDA_ARCH__
         for (size_type i = 0; i < size_; ++i) Allocator::destroy(data_ + i);
         allocator_.deallocate(data_);
-        #else
+#else
         if (size_ && !std::is_trivially_destructible_v<value_type>)
         {
             auto [num_blocks, num_threads] = get_blocks_config(size_);
@@ -200,21 +200,21 @@ public:
         }
         SPDLOG_TRACE("Deallocating memory for {} elements at {}.", capacity_, reinterpret_cast<void*>(data_));
         if (capacity_) allocator_.deallocate(data_);
-        #endif
+#endif
     }
 
     // Copy constructor.
     __host__ __device__ CUDAVector(const CUDAVector& other) : capacity_(other.capacity_), size_(other.size_)
     {
         // Capacity.
-        #ifdef __CUDA_ARCH__
+#ifdef __CUDA_ARCH__
         data_ = allocator_.allocate(capacity_);
 
         for (size_type i = 0; i < other.size_; ++i)
         {
             data_[i] = other.data_[i];
         }
-        #else
+#else
         data_ = allocator_.allocate(capacity_);
         auto [num_blocks, num_threads] = get_blocks_config(size_);
         SPDLOG_TRACE("Copy constructing vector of size {}", size_);
@@ -224,17 +224,17 @@ public:
             copy_construct_kernel<<<num_blocks, num_threads>>>(data_, size_, other.data_);
             cudaDeviceSynchronize();
         }
-        #endif
+#endif
     }
 
     // Move constructor.
     __host__ __device__ CUDAVector(CUDAVector&& other) noexcept :
         capacity_(other.capacity_), size_(other.size_), data_(other.data_)
     {
-    #ifndef __CUDA_ARCH__
+#ifndef __CUDA_ARCH__
         SPDLOG_TRACE("Moving construct vector with data at {} and size {}",
                      reinterpret_cast<void*>(other.data_), other.size_);
-    #endif
+#endif
         capacity_ = other.capacity_;
         other.capacity_ = 0;
 
@@ -243,9 +243,9 @@ public:
 
         data_ = other.data_;
         other.data_ = nullptr;
-    #ifndef __CUDA_ARCH__
+#ifndef __CUDA_ARCH__
         SPDLOG_TRACE("Done moving vector");
-    #endif
+#endif
     }
 
     // Copy assignment operator.
@@ -253,16 +253,16 @@ public:
     {
         if (this == &other) return *this;
         decltype(data_) data_new = allocator_.allocate(other.size());
-        #ifdef __CUDA_ARCH__
+#ifdef __CUDA_ARCH__
         for (size_type i = 0; i < other.size_; ++i)
         {
             allocator_.construct(data_new + i);
             data_new[i] = other.data_[i];
         }
-        #else
+#else
         auto [num_blocks, num_threads] = get_blocks_config(other.size());
         copy_construct_kernel<<<num_blocks, num_threads>>>(data_new, other.size(), other.data());
-        #endif
+#endif
         clear();
         if (capacity_) allocator_.deallocate(data_);
         capacity_ = other.size_;
@@ -309,15 +309,15 @@ public:
     {
         if (size_ != other.size_)
         {
-        #ifndef __CUDA_ARCH__
+#ifndef __CUDA_ARCH__
             SPDLOG_TRACE("Operator == for cuda vector: different sizes");
-        #endif
+#endif
             return false;
         }
-        #ifdef __CUDA_ARCH__
+#ifdef __CUDA_ARCH__
         for (size_type i = 0; i < size_; ++i) if (*(data_ + i) != *(other.data_ + i)) return false;
         return true;
-        #else
+#else
         SPDLOG_TRACE("Equality operator for cuda vectors of size {}", size_);
         bool equal;
         bool *d_equal;
@@ -328,37 +328,36 @@ public:
         SPDLOG_TRACE("Vectors equal: {}", equal);
 
         return equal;
-        #endif
+#endif
     }
 
     // Sets size to 0 without reallocation or changing capacity.
     __host__ __device__ void clear()
     {
-        #ifndef __CUDA_ARCH__
+#ifndef __CUDA_ARCH__
         CUDA_FAST_ERROR_CHECK(typeid(T).name() + std::string("Clear starting: {}"));
-        #endif
+#endif
         if (!size_) return;
-        #ifdef __CUDA_ARCH__
+#ifdef __CUDA_ARCH__
         for (size_type i = 0; i < size_; ++i) allocator_.destroy(data_ + i);
-        #else
+#else
         auto [num_blocks, num_threads] = get_blocks_config(size_);
         destruct_kernel<T, Allocator><<<num_blocks, num_threads>>>(data_, size_);
         cudaDeviceSynchronize();
         CUDA_FAST_ERROR_CHECK(typeid(T).name() + std::string("Clear: destruct kernel {}"));
-        #endif
+#endif
         size_ = 0;
     }
 
     __host__ __device__ bool set(LongIndex index, const value_type &value)
     {
         if (index >= size_) return false;
-        #ifdef __CUDA_ARCH__
+#ifdef __CUDA_ARCH__
         data_[index] = value;
-        #else
-        // SPDLOG_TRACE("Cuda vector: setting value at index {}", index);
+#else
         gpu_insert<T>(value, data_ + index);
         cudaDeviceSynchronize();
-        #endif
+#endif
         return true;
     }
 
@@ -394,17 +393,17 @@ public:
 
     __host__ __device__ void push_back(const value_type& value)
     {
-    #ifndef __CUDA_ARCH__
+#ifndef __CUDA_ARCH__
         CUDA_FAST_ERROR_CHECK(typeid(T).name() + std::string(" Push back, starting: {}"));
-    #endif
+#endif
         if (size_ == capacity_) reserve((size_ + 1) * 2);
-    #ifdef __CUDA_ARCH__
+#ifdef __CUDA_ARCH__
         Allocator::construct(data_ + size_, value);
         ++size_;
-    #else
+#else
         resize(size_ + 1);
         set(size_ - 1, value);
-    #endif
+#endif
     }
 
     __device__ value_type pop_back()
@@ -415,10 +414,10 @@ public:
 
     __host__ __device__ void reserve(size_type new_capacity)
     {
-         if (new_capacity <= capacity_) return;
-        #ifdef __CUDA_ARCH__
+        if (new_capacity <= capacity_) return;
+#ifdef __CUDA_ARCH__
         dev_reserve(new_capacity);
-        #else
+#else
         CUDA_FAST_ERROR_CHECK(typeid(T).name() + std::string(" Starting with an error already: {}"));
         SPDLOG_TRACE("Reserving cuda vector with size {} and capacity {} for capacity {}", size_, capacity_,
                      new_capacity);
@@ -437,18 +436,18 @@ public:
         allocator_.deallocate(data_);
         data_ = new_data;
         capacity_ = new_capacity;
-        #endif
+#endif
     }
 
     __host__ __device__ void resize(size_type new_size)
     {
-    #ifndef __CUDA_ARCH__ // Host only
+#ifndef __CUDA_ARCH__ // Host only
         CUDA_FAST_ERROR_CHECK(typeid(T).name() + std::string(" Resize: starting {}"));
-    #endif // Host + device
+#endif // Host + device
         if (new_size == size_) return;
-    #ifdef __CUDA_ARCH__ // Device only
+#ifdef __CUDA_ARCH__ // Device only
         dev_resize(new_size);
-    #else // Host only
+#else // Host only
         if (new_size > size_)
         {
             reserve(new_size);
@@ -465,7 +464,7 @@ public:
         }
         cudaDeviceSynchronize();
         size_ = new_size;
-    #endif
+#endif
     }
 
     __host__ __device__ iterator begin() { return data_; }
@@ -489,13 +488,13 @@ public:
         }
         size_t tail_length = end() - end_iter;
         size_t num_destruct = end() - begin_iter;
-    #ifdef __CUDA_ARCH__ // Device only
+#ifdef __CUDA_ARCH__ // Device only
         for (size_t i = 0; i < tail_length; ++i)
         {
             *(begin_iter + i) = ::cuda::std::move(*(begin_iter + i + num_to_remove));
         }
         resize(size_ - num_destruct + tail_length);
-    #else // Host only
+#else // Host only
         // Allocate memory
         T* data_buf = allocator_.allocate(tail_length);
         // Move_construct tail to memory. All these kernels are implicitly synchronized.
@@ -510,7 +509,7 @@ public:
         // Clean up buffer
         destruct_kernel<T, Allocator><<<num_blocks_mv, num_threads_mv>>>(data_buf, tail_length);
         allocator_.deallocate(data_buf);
-    #endif
+#endif
     }
 
     __host__ T copy_at(size_t index) const
@@ -538,13 +537,13 @@ public:
         }
         T* source_data = data_;
         data_ = allocator_.allocate(capacity_);
-    #ifdef __CUDA_ARCH__ // Device only:
+#ifdef __CUDA_ARCH__ // Device only:
         PRINTF_DEBUG("Device vector actualize\n");
         for (size_t i = 0; i < size_; ++i)
             new (data_ + i) T(*(source_data + i));
         PRINTF_DEBUG("End device vector actualize\n");
 
-    #else // Host only:
+#else // Host only:
         CUDA_FAST_ERROR_CHECK(typeid(T).name() + std::string(" Starting actualize: {}"));
         SPDLOG_TRACE("Actualizing vector of {}.", typeid(T).name());
         auto [num_blocks, num_threads] = get_blocks_config(size_);
@@ -555,7 +554,7 @@ public:
         cudaDeviceSynchronize();
         CUDA_FAST_ERROR_CHECK(typeid(T).name() + std::string(" Finish actualize: {}"));
         SPDLOG_TRACE("Done actualizing vector");
-    #endif
+#endif
     }
 
 private:

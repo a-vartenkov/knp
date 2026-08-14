@@ -1,7 +1,7 @@
 /**
  * @file vector_view.cuh
  * @brief Plain old data representation for an std-like vector.
- * @kaspersky_support Artiom N.
+ * @kaspersky_support A. Vartenkov
  * @date 06.07.2025
  * @license Apache 2.0
  * @copyright © 2025 AO Kaspersky Lab

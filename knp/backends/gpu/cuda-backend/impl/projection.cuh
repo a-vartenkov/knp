@@ -64,9 +64,9 @@ struct CUDAProjection
     using Synapse = ::cuda::std::tuple<SynapseParameters, device_lib::LongIndex, device_lib::LongIndex>;
 
     __host__ __device__ CUDAProjection()
-    #if !defined(__CUDA_ARCH__)
+#if !defined(__CUDA_ARCH__)
              :  is_locked_(true)
-    #endif
+#endif
     {}
 
     /**
@@ -79,12 +79,16 @@ struct CUDAProjection
           postsynaptic_uid_(to_gpu_uid(projection.get_postsynaptic())),
           is_locked_(projection.is_locked())
     {
+        constexpr int data_index = core::SynapseElementAccess::synapse_data;
+        constexpr int source_id_index = core::SynapseElementAccess::source_neuron_id;
+        constexpr int target_id_index = core::SynapseElementAccess::target_neuron_id;
         for (auto &synapse : projection)
         {
-            Synapse out_synapse{std::get<0>(synapse), std::get<1>(synapse), std::get<2>(synapse)};
+            Synapse out_synapse{std::get<data_index>(synapse), std::get<source_id_index>(synapse),
+                    std::get<target_id_index>(synapse)};
             synapses_.push_back(out_synapse);
-            SPDLOG_TRACE("Synapse: weight {} delay {}", ::cuda::std::get<0>(out_synapse).weight_,
-                         ::cuda::std::get<0>(out_synapse).delay_);
+            SPDLOG_TRACE("Synapse: weight {} delay {}", ::cuda::std::get<data_index>(out_synapse).weight_,
+                         ::cuda::std::get<data_index>(out_synapse).delay_);
         }
         index_ = device_lib::build_index<SynapseType>(projection);
     }
