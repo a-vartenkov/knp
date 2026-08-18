@@ -104,6 +104,7 @@ struct ValueIndex
     }
 };
 
+
 /**
  * @brief Calculates the total number of values for all impulses.
  * @param index The built value index.
@@ -111,6 +112,7 @@ struct ValueIndex
  * @return total number of values for the inputs.
  */
 __host__ LongIndex count_values_by_indexes(const ValueIndex &index, const CUDAVectorView<cuda::SpikeIndex> inputs);
+
 
 /**
  * @brief Build exclusive prefix sum for number of synapses per neuron.
@@ -149,7 +151,7 @@ __host__ ValueIndex build_index(const knp::core::Projection<SynapseType> &cpu_pr
     for (auto iter = buffer.begin(); iter != buffer.end(); ++iter)
     {
         LongIndex current_neuron = (*iter).first;
-        // Filling offsets for skipped neurons: if first three are missing that would be (0, 0, 0, 0, 5...
+        // Filling offsets for skipped neurons: if first three are missing that would be 0, 0, 0, 0, 5...
         for (auto i = first_neuron; i < current_neuron; ++i)
         {
             offsets.push_back(current_offset);

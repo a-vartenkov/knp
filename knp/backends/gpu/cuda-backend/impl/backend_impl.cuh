@@ -48,16 +48,19 @@
 #include <cuda/std/variant>
 
 #include "projection.cuh"
+#include "projections_impl.cuh"
 #include "population.cuh"
 #include "cuda_bus/message_bus.cuh"
 #include "cuda_lib/vector.cuh"
 
 
 /**
- * @brief Namespace for single-threaded backend.
+ * @brief Namespace for CUDA backend.
  */
 namespace knp::backends::gpu::cuda
 {
+using StepIndex = unsigned long long;
+
 
 /**
  * @brief The CUDABackend class is a definition of an interface to the CUDA GPU backend.
@@ -65,27 +68,9 @@ namespace knp::backends::gpu::cuda
 class CUDABackendImpl
 {
 public:
-    using StepIndex = unsigned long long;
 
-    /**
-     * @brief List of neuron types supported by the single-threaded CPU backend.
-     */
     using SupportedNeurons = boost::mp11::mp_list<knp::neuron_traits::BLIFATNeuron>;
-
-    /**
-     * @brief List of synapse types supported by the single-threaded CPU backend.
-     */
-    using SupportedSynapses = boost::mp11::mp_list<knp::synapse_traits::DeltaSynapse>;
-
-    /**
-     * @brief List of supported population types based on neuron types specified in `SupportedNeurons`.
-     */
     using SupportedPopulations = boost::mp11::mp_transform<CUDAPopulation, SupportedNeurons>;
-
-    /**
-     * @brief List of supported projection types based on synapse types specified in `SupportedSynapses`.
-     */
-    using SupportedProjections = boost::mp11::mp_transform<CUDAProjection, SupportedSynapses>;
 
     /**
      * @brief Population variant that contains any population type specified in `SupportedPopulations`.
@@ -98,16 +83,6 @@ public:
      */
     using PopulationVariants = boost::mp11::mp_rename<SupportedPopulations, ::cuda::std::variant>;
 
-    /**
-     * @brief Projection variant that contains any projection type specified in `SupportedProjections`.
-     * @details `ProjectionVariants` takes the value of `std::variant<ProjectionType_1,..., ProjectionType_n>`, where
-     * `ProjectionType_[1..n]` is the projection type specified in `SupportedProjections`. \n
-     * For example, if `SupportedProjections` contains DeltaSynapse and AdditiveSTDPSynapse types,
-     * then `ProjectionVariants = std::variant<DeltaSynapse, AdditiveSTDPSynapse>`. \n
-     * `ProjectionVariants` retains the same order of message types as defined in `SupportedProjections`.
-     * @see ALL_SYNAPSES.
-     */
-    using ProjectionVariants = boost::mp11::mp_rename<SupportedProjections, ::cuda::std::variant>;
 
     /**
      * @brief Map used for message construction. It maps a message to its future output step.
@@ -281,28 +256,6 @@ public:
         return device_lib::CUDAVector<SpikeIndex>{};
     }
 
-
-    /**
-     * @brief Calculate projection of delta synapses.
-     * @note Projection will be changed during calculation.
-     * @param projection projection to calculate.
-     * @param message_queue message queue to send to projection for calculation.
-     */
-    __host__ void calculate_projection(
-            CUDAProjection<knp::synapse_traits::DeltaSynapse> &projection,
-            const std::vector<device_lib::LongIndex> &message_ids,
-            StepIndex step_n);
-
-    __host__ void calculate_projection(
-            CUDAProjection<knp::synapse_traits::AdditiveSTDPDeltaSynapse> &projection,
-            const std::vector<device_lib::LongIndex> &message_ids,
-            StepIndex step_n);
-
-    __host__ void calculate_projection(
-            CUDAProjection<knp::synapse_traits::SynapticResourceSTDPDeltaSynapse> &projection,
-            const std::vector<device_lib::LongIndex> &message_ids,
-            StepIndex step_n);
-
     void init();
 
 private:
@@ -315,7 +268,7 @@ private:
 
 
 template <>
-CUDABackendImpl::PopulationVariants gpu_extract<CUDABackendImpl::PopulationVariants>(
+[[nodiscard]] CUDABackendImpl::PopulationVariants gpu_extract<CUDABackendImpl::PopulationVariants>(
         const CUDABackendImpl::PopulationVariants *message);
 
 template <>
@@ -323,11 +276,9 @@ void gpu_insert<CUDABackendImpl::PopulationVariants>(const CUDABackendImpl::Popu
                                                      CUDABackendImpl::PopulationVariants *gpu_target);
 
 template <>
-CUDABackendImpl::ProjectionVariants gpu_extract<CUDABackendImpl::ProjectionVariants>(
-        const CUDABackendImpl::ProjectionVariants *message);
+[[nodiscard]] ProjectionVariants gpu_extract<ProjectionVariants>(const ProjectionVariants *message);
 
 template <>
-void gpu_insert<CUDABackendImpl::ProjectionVariants>(const CUDABackendImpl::ProjectionVariants &cpu_source,
-                                                     CUDABackendImpl::ProjectionVariants *gpu_target);
+void gpu_insert<ProjectionVariants>(const ProjectionVariants &cpu_source, ProjectionVariants *gpu_target);
 
 }   // namespace knp::backends::gpu::cuda
