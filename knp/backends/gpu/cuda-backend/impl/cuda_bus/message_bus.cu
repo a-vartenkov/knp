@@ -152,7 +152,7 @@ __global__ void get_message_kernel(const MessageVariant *var, int *type, const v
 __host__ void CUDAMessageBus::subscribe_host(const cuda::UID &receiver, const std::vector<cuda::UID> &senders,
                                              size_t type_id)
 {
-    knp::core::UID host_receiver = to_cpu_uid(receiver);
+    const knp::core::UID host_receiver = to_cpu_uid(receiver);
     std::vector <knp::core::UID> host_senders;
     host_senders.reserve(senders.size());
     for (const cuda::UID &cuda_uid : senders)
@@ -176,9 +176,10 @@ __host__ void CUDAMessageBus::subscribe_host(const cuda::UID &receiver, const st
 
 
 // We need to check that the messages we get from host were not previously sent there by GPU.
-__global__ void same_sender_kernel(cuda::UID uid, cuda::Subscription *subscriptions, size_t sub_size, bool *result)
+__global__ void same_sender_kernel(cuda::UID uid, cuda::Subscription *subscriptions, size_t sub_size,
+                                   bool *result)
 {
-    auto i = blockIdx.x * blockDim.x + threadIdx.x;
+    const auto i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= sub_size) return;
     if (subscriptions[i].get_receiver_uid() == uid) *result = true;
 }
@@ -189,15 +190,15 @@ __host__ bool same_sender(const knp::core::messaging::MessageVariant &message,
 {
     if (subs.size() == 0) return false;
 
-    knp::core::UID sender_uid = std::visit([](const auto &msg) { return msg.header_.sender_uid_; }, message);
+    const knp::core::UID sender_uid = std::visit([](const auto &msg) { return msg.header_.sender_uid_; }, message);
 
-    cuda::UID gpu_uid = to_gpu_uid(sender_uid);
+    const cuda::UID gpu_uid = to_gpu_uid(sender_uid);
     bool result = false;
     bool *result_ptr;
 
     call_and_check(cudaMalloc(&result_ptr, sizeof(bool)));
     call_and_check(cudaMemcpy(result_ptr, &result, sizeof(bool), cudaMemcpyHostToDevice));
-    auto [num_blocks, num_threads] = device_lib::get_blocks_config(subs.size());
+    const auto [num_blocks, num_threads] = device_lib::get_blocks_config(subs.size());
     same_sender_kernel<<<num_blocks, num_threads>>>(gpu_uid, subs.data(), subs.size(), result_ptr);
     call_and_check(cudaMemcpy(&result, result_ptr, sizeof(bool), cudaMemcpyDeviceToHost));
     call_and_check(cudaFree(result_ptr));
@@ -243,8 +244,7 @@ __host__ void CUDAMessageBus::receive_messages_from_host()
                     = cpu_endpoint_.unload_messages<knp::core::messaging::SpikeMessage>(receiver_uid);
             for (auto &msg : message_buf)
             {
-                auto gpu_msg = make_gpu_message(msg);
-                send_message(std::move(gpu_msg));
+                send_message(make_gpu_message(msg));
             }
         }
         else if (type == 1)
@@ -254,8 +254,7 @@ __host__ void CUDAMessageBus::receive_messages_from_host()
                     = cpu_endpoint_.unload_messages<MessageType>(receiver_uid);
             for (auto &msg : message_buf)
             {
-                auto gpu_msg = make_gpu_message(msg);
-                send_message(std::move(gpu_msg));
+                send_message(make_gpu_message(msg));
             }
         }
     }

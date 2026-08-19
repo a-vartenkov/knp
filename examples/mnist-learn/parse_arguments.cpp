@@ -174,14 +174,7 @@ std::optional<ModelDescription> parse_arguments(int argc, char** argv)
         model_desc.model_saving_path_ = "";
     }
 
-    if (vm.count("inference_only"))
-    {
-        model_desc.inference_only_ = true;
-    }
-    else
-    {
-        model_desc.inference_only_ = false;
-    }
+    model_desc.inference_only_ = vm.count("inference_only") > 0;
 
     if (vm.count("logging_level"))
     {

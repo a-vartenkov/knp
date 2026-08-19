@@ -39,6 +39,7 @@
 #include "messaging.cuh"
 #include "../cuda_lib/vector.cuh"
 
+
 /**
  * @brief Namespace for CUDA message bus implementations.
  */
@@ -73,7 +74,6 @@ struct MessageBuffer
         }
     }
 
-
     [[nodiscard]] std::vector<device_lib::LongIndex> find_message_ids(const knp::core::UID &sender) const
     {
         auto iter = message_ids_.find(sender);
@@ -102,14 +102,15 @@ public:
      * @brief Construct GPU message bus.
      * @param external_endpoint message endpoint used for message exchange with host.
      */
-    explicit CUDAMessageBus(knp::core::MessageEndpoint &external_endpoint) :
-            cpu_endpoint_{external_endpoint}
+    explicit CUDAMessageBus(knp::core::MessageEndpoint &external_endpoint) : cpu_endpoint_{external_endpoint}
     {}
+
 private:
     template<class MessageType>
     MessageBuffer<MessageType>& get_message_buffer();
     template<class MessageType>
     const MessageBuffer<MessageType>& get_message_buffer() const;
+
 public:
     /**
      * @brief Add a subscription to messages of the specified type from senders with given UIDs.
@@ -140,7 +141,6 @@ public:
         return get_message_buffer<MessageType>().messages_;
     }
 
-
     /**
      * @brief Unsubscribe from messages of a specified type.
      * @tparam MessageType type of messages to which the receiver is subscribed.
@@ -155,7 +155,6 @@ public:
      * @param receiver receiver UID.
      */
     __host__ void remove_receiver(const cuda::UID &receiver);
-
 
     template <class MessageType>
     __host__ void send_message(MessageType &&message)
@@ -213,7 +212,6 @@ public:
      */
     template <class MessageType>
     __host__ void send_messages(const cuda::UID &receiver_uid, device_lib::CUDAVector<MessageType> &result_messages);
-
 
     template <class MessageType>
     __host__ std::vector<device_lib::LongIndex> unload_messages(const cuda::UID &receiver_uid) const
