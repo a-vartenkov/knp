@@ -50,6 +50,7 @@
 #include "projection.cuh"
 #include "projections_impl.cuh"
 #include "population.cuh"
+#include "populations_impl.cuh"
 #include "cuda_bus/message_bus.cuh"
 #include "cuda_lib/vector.cuh"
 
@@ -68,21 +69,6 @@ using StepIndex = unsigned long long;
 class CUDABackendImpl
 {
 public:
-
-    using SupportedNeurons = boost::mp11::mp_list<knp::neuron_traits::BLIFATNeuron>;
-    using SupportedPopulations = boost::mp11::mp_transform<CUDAPopulation, SupportedNeurons>;
-
-    /**
-     * @brief Population variant that contains any population type specified in `SupportedPopulations`.
-     * @details `PopulationVariants` takes the value of `std::variant<PopulationType_1,..., PopulationType_n>`, where
-     * `PopulationType_[1..n]` is the population type specified in `SupportedPopulations`. \n
-     * For example, if `SupportedPopulations` contains BLIFATNeuron and IzhikevichNeuron types,
-     * then `PopulationVariants = std::variant<BLIFATNeuron, IzhikevichNeuron>`. \n
-     * `PopulationVariants` retains the same order of message types as defined in `SupportedPopulations`.
-     * @see ALL_NEURONS.
-     */
-    using PopulationVariants = boost::mp11::mp_rename<SupportedPopulations, ::cuda::std::variant>;
-
 
     /**
      * @brief Map used for message construction. It maps a message to its future output step.
@@ -238,24 +224,6 @@ public:
     __host__ void calculate_projections(StepIndex step);
     __host__ knp::backends::gpu::cuda::CUDAMessageBus &get_message_bus() { return device_message_bus_; }
 
-public:
-    /**
-     * @brief Calculate population of BLIFAT neurons.
-     * @note Population will be changed during calculation.
-     * @param population population to calculate.
-     * @return set of spiked neuron indices.
-     */
-    device_lib::CUDAVector<SpikeIndex> calculate_population(
-            CUDAPopulation<knp::neuron_traits::BLIFATNeuron> &population, StepIndex step);
-
-    inline device_lib::CUDAVector<SpikeIndex> calculate_population(
-            CUDAPopulation<knp::neuron_traits::SynapticResourceSTDPBLIFATNeuron> &population,
-            StepIndex step_n)
-    {
-        SPDLOG_ERROR("The calculate_population function is not implemented for synaptic resource STDP BLIFAT neuron");
-        return device_lib::CUDAVector<SpikeIndex>{};
-    }
-
     void init();
 
 private:
@@ -268,12 +236,10 @@ private:
 
 
 template <>
-[[nodiscard]] CUDABackendImpl::PopulationVariants gpu_extract<CUDABackendImpl::PopulationVariants>(
-        const CUDABackendImpl::PopulationVariants *message);
+[[nodiscard]] PopulationVariants gpu_extract<PopulationVariants>(const PopulationVariants *message);
 
 template <>
-void gpu_insert<CUDABackendImpl::PopulationVariants>(const CUDABackendImpl::PopulationVariants &cpu_source,
-                                                     CUDABackendImpl::PopulationVariants *gpu_target);
+void gpu_insert<PopulationVariants>(const PopulationVariants &cpu_source, PopulationVariants *gpu_target);
 
 template <>
 [[nodiscard]] ProjectionVariants gpu_extract<ProjectionVariants>(const ProjectionVariants *message);

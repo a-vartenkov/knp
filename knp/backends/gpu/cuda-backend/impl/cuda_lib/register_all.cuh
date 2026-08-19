@@ -24,7 +24,7 @@
 
 // TODO: make a recursive macro put of it.
 #define REGISTER_ALL_TYPES \
-REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDABackendImpl::PopulationVariants); \
+REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::PopulationVariants); \
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::ProjectionVariants); \
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAPopulation<knp::neuron_traits::BLIFATNeuron>); \
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAProjection<knp::synapse_traits::DeltaSynapse>); \

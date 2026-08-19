@@ -51,14 +51,14 @@ __global__ void find_subscription_by_receiver(const Subscription *subscriptions,
 
 
 template <typename MessageType>
-__host__ size_t CUDAMessageBus::find_subscription(const cuda::UID &receiver)
+__host__ size_t CUDAMessageBus::find_subscription(const cuda::UID &receiver) const
 {
     constexpr size_t type_index = boost::mp11::mp_find<MessageVariant, MessageType>::value;
     return find_subscription(receiver, type_index);
 }
 
 
-__host__ size_t CUDAMessageBus::find_subscription(const cuda::UID &receiver, size_t type_index)
+__host__ size_t CUDAMessageBus::find_subscription(const cuda::UID &receiver, size_t type_index) const
 {
     if (!subscriptions_.size()) return 0;
     auto [num_blocks, num_threads] = device_lib::get_blocks_config(subscriptions_.size());

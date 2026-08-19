@@ -216,7 +216,7 @@ public:
 
 
     template <class MessageType>
-    __host__ std::vector<device_lib::LongIndex> unload_messages(const cuda::UID &receiver_uid)
+    __host__ std::vector<device_lib::LongIndex> unload_messages(const cuda::UID &receiver_uid) const
     {
         constexpr auto type_index = boost::mp11::mp_find<CUDAMessageVariant, MessageType>();
         size_t subscription_id = find_subscription(receiver_uid, type_index);
@@ -285,9 +285,9 @@ private:
     }
 
     template <typename MessageType>
-    __host__ size_t find_subscription(const cuda::UID &receiver);
+    [[nodiscard]] __host__ size_t find_subscription(const cuda::UID &receiver) const;
 
-    __host__ size_t find_subscription(const cuda::UID &receiver, size_t type_id);
+    [[nodiscard]] __host__ size_t find_subscription(const cuda::UID &receiver, size_t type_id) const;
 
     template <typename MessageType>
     __host__ __device__ ::cuda::std::vector<device_lib::LongIndex> find_messages(const Subscription &subscription);
