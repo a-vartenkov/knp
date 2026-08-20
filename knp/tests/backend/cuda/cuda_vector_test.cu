@@ -105,7 +105,7 @@ __global__ void copy_uid_kernel(size_t begin, size_t end, knp::backends::gpu::cu
     printf("Copy uid kernel, begin: %lu, end: %lu, sizeof data %lu\n", begin, end,
            sizeof(knp::backends::gpu::cuda::UID));
     if (end <= begin) return;
-    size_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t i = blockIdx.x * blockDim.x + threadIdx.x;
     printf("Copy kernel: index %lu, from %p to %p\n", i, data_from + begin + i, data_to + begin + i);
     if (i >= end - begin) return;
     new (data_to + begin + i) knp::backends::gpu::cuda::UID(*(data_from + begin + i));

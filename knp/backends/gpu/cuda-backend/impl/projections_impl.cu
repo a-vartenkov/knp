@@ -195,7 +195,8 @@ __host__ void calculate_projection(
         const device_lib::LongIndex msg_index = message_ids[i];
         const size_t data_size = messages[msg_index].neuron_indexes_.size();
         auto msg_data_pointer_cpu = messages[msg_index].neuron_indexes_.data();
-        SPDLOG_TRACE("Got message data: pointer {}, size {}", (void*)msg_data_pointer_cpu, data_size);
+        SPDLOG_TRACE("Got message data: pointer {}, size {}", reinterpret_cast<const void*>(msg_data_pointer_cpu),
+                     data_size);
 
         if (data_size)
         {

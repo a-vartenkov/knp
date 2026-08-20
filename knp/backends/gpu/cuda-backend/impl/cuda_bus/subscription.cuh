@@ -172,14 +172,16 @@ public:
     [[nodiscard]] __host__ __device__ bool has_sender(const cuda::UID &uid) const
     {
 #if defined(__CUDA_ARCH__)
-        PRINTF_DEBUG("Using has_sender on device\n");
+        PRINTF_TRACE("Using has_sender on device\n");
         for (size_t i = 0; i < senders_.size(); ++i)
         {
             if (senders_[i] == uid)
             {
+                PRINTF_TRACE("Found sender\n");
                 return true;
             }
         }
+        PRINTF_TRACE("No sender found\n");
         return false;
 #else
         if (senders_.size() == 0) return false;

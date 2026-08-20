@@ -36,6 +36,7 @@ struct CUDAVectorView
     const LongIndex size_;
 };
 
+
 /**
  * @brief Plain Old Data structure for CUDAVector representation, use to pass into kernels that change the contents.
  * @tparam T value type for CUDAVector.

@@ -21,6 +21,8 @@
 
 #include <iostream>
 
+#include <knp/framework/upcasting.h>
+
 #include "dataset.h"
 #include "evaluate_results.h"
 #include "inference.h"

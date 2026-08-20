@@ -320,6 +320,8 @@ BOOST_DLL_ALIAS(knp::backends::gpu::CUDABackend::create, create_knp_backend)
 
 }  // namespace knp::backends::gpu
 
+
+// TODO: Probably wrap it into a recursive macro.
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::PopulationVariants);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::ProjectionVariants);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::CUDAPopulation<knp::neuron_traits::BLIFATNeuron>);

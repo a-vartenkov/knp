@@ -29,15 +29,14 @@ namespace knp::backends::gpu::cuda::device_lib
 __global__ void summarize_index_kernel(IndexView index, device_lib::CUDAVectorView<cuda::SpikeIndex> senders,
                                        LongIndex *result)
 {
-    LongIndex thread_id = blockIdx.x * blockDim.x + threadIdx.x;
-    LongIndex value = 0;
-    if (index.offsets_size_ != 0 && thread_id < index.offsets_size_ - 1)
-    {
-        value = index.offsets_ptr_[thread_id + 1] - index.offsets_ptr_[thread_id];
-    }
-    else return;
+    const LongIndex thread_id = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index.offsets_size_ == 0 || thread_id >= index.offsets_size_ - 1)
+        return;
+
+    LongIndex value = index.offsets_ptr_[thread_id + 1] - index.offsets_ptr_[thread_id];
     atomicAdd(result, value);
 }
+
 
 /**
  * @brief Calculates the total number of values for all impulses.

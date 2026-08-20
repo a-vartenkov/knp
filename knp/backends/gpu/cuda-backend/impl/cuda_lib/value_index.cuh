@@ -58,9 +58,6 @@ struct IndexView
  */
 struct ValueIndex
 {
-    device_lib::CUDAVector<LongIndex> indices_;
-    device_lib::CUDAVector<LongIndex> offsets_;
-
     /**
      * @brief Construct a POD view.
      * @return POD structure that can then be sent to __global__ functions easily.
@@ -102,6 +99,10 @@ struct ValueIndex
         indices_.actualize();
         offsets_.actualize();
     }
+
+    device_lib::CUDAVector<LongIndex> indices_;
+    device_lib::CUDAVector<LongIndex> offsets_;
+
 };
 
 
@@ -132,7 +133,7 @@ __host__ ValueIndex build_index(const knp::core::Projection<SynapseType> &cpu_pr
     for (size_t i = 0; i < cpu_projection.size(); ++i)
     {
         const auto &synapse = cpu_projection[i];
-        auto neuron_id = std::get<core::source_neuron_id>(synapse);
+        const auto neuron_id = std::get<core::source_neuron_id>(synapse);
         auto map_iter = buffer.find(neuron_id);
         if (map_iter == buffer.end())
         {
@@ -141,7 +142,7 @@ __host__ ValueIndex build_index(const knp::core::Projection<SynapseType> &cpu_pr
         map_iter->second.push_back(i);
     }
     LongIndex current_offset = 0;
-    LongIndex last_neuron = buffer.rbegin()->first;
+    const LongIndex last_neuron = buffer.rbegin()->first;
 
     std::vector<LongIndex> indices(cpu_projection.size());
     std::vector<LongIndex> offsets;

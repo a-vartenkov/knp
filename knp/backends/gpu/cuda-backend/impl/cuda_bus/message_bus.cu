@@ -42,7 +42,7 @@ using DevVec = device_lib::CUDAVector<T>;
 __global__ void find_subscription_by_receiver(const Subscription *subscriptions, size_t size, const UID receiver,
                                               size_t type, size_t *index_out)
 {
-    size_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= size) return;
     const Subscription &sub = subscriptions[i];
     if (sub.type() != type) return;
@@ -116,7 +116,7 @@ __host__ void CUDAMessageBus::remove_receiver(const cuda::UID &receiver)
 __global__ void find_messages_kernel(const MessageVariant *messages, size_t messages_size, Subscription *subscription,
                                      device_lib::LongIndex *indices, device_lib::LongIndex *counter)
 {
-    device_lib::LongIndex i = blockIdx.x * blockDim.x + threadIdx.x;
+    const device_lib::LongIndex i = blockIdx.x * blockDim.x + threadIdx.x;
     PRINTF_DEBUG("Find message kernel, i %lu\n", i);
     if (i >= messages_size) return;
     if (subscription->is_my_message(messages[i]))

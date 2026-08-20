@@ -140,7 +140,7 @@ void gpu_insert<PopulationVariants>(const PopulationVariants &cpu_source, Popula
 template<class T>
 __global__ void get_uids_kernel(const T *data, size_t size, cuda::UID *result)
 {
-    size_t index = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t index = blockIdx.x * blockDim.x + threadIdx.x;
     if (index >= size) return;
     result[index] = ::cuda::std::visit([](auto &v) { return v.uid_; }, data[index]);
 }

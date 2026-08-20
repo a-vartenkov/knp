@@ -137,7 +137,7 @@ __global__ void copy_host_impact_kernel(cuda::SynapticImpact *impacts_to,
                                         const knp::core::messaging::SynapticImpact *impacts_from,
                                         size_t num_impacts)
 {
-    size_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= num_impacts) return;
     *(impacts_to + i) = detail::make_gpu_impact(*(impacts_from + i));
 }
@@ -147,7 +147,7 @@ __global__ void copy_gpu_impact_kernel(knp::core::messaging::SynapticImpact *imp
                                        const cuda::SynapticImpact *impacts_from,
                                        size_t num_impacts)
 {
-    size_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= num_impacts) return;
     *(impacts_to + i) = detail::make_host_impact(*(impacts_from + i));
 }

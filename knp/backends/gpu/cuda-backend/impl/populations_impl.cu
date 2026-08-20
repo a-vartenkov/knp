@@ -35,7 +35,7 @@ using BlifatParams = knp::neuron_traits::neuron_parameters<knp::neuron_traits::B
 __global__ void calculate_neurons_pre_impact(device_lib::CUDAVectorMutableView<BlifatParams> neurons,
                                              StepIndex current_step)
 {
-    size_t neuron_index = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t neuron_index = blockIdx.x * blockDim.x + threadIdx.x;
     if (neuron_index >= neurons.size_) return;
 
     BlifatParams &neuron = neurons.data_[neuron_index];
@@ -67,7 +67,7 @@ __global__ void calculate_neurons_pre_impact(device_lib::CUDAVectorMutableView<B
 __global__ void calculate_neurons_impacts(device_lib::CUDAVectorMutableView<BlifatParams> neurons,
                                           device_lib::CUDAVectorView<SynapticImpact> impacts)
 {
-    size_t impact_index = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t impact_index = blockIdx.x * blockDim.x + threadIdx.x;
     if (impact_index >= impacts.size_) return;
     const SynapticImpact &impact = impacts.data_[impact_index];
     if (impact.postsynaptic_neuron_index_ >= neurons.size_) return;
@@ -110,7 +110,7 @@ __host__ void calculate_neurons_impacts_all(device_lib::CUDAVectorMutableView<Bl
 __global__ void calculate_neurons_post_impact(device_lib::CUDAVectorMutableView<BlifatParams> neurons,
                                               SpikeIndex *spike_buffer, SpikeIndex *size_counter)
 {
-    size_t neuron_index = blockIdx.x * blockDim.x + threadIdx.x;
+    const size_t neuron_index = blockIdx.x * blockDim.x + threadIdx.x;
     bool spike = false;
     neuron_traits::neuron_parameters <neuron_traits::BLIFATNeuron> &neuron = neurons.data_[neuron_index];
     if (neuron.total_blocking_period_ <= 0)
