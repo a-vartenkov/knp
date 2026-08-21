@@ -141,37 +141,6 @@ public:
         return res;
     }
 
-    /**
-     * @brief Make a plain old data structure that can be sent into CUDA kernels.
-     * @return a structure consisting of size and pointer.
-     */
-    __host__ __device__ CUDAVectorView<T> view() const
-    {
-        return {data_, size_};
-    }
-
-    __host__ __device__ CUDAVectorMutableView<T> mut_view()
-    {
-        return {data_, size_};
-    }
-
-    CUDAVectorView<T> view(size_type begin, size_type end) const
-    {
-        LongIndex size_out = 0;
-        if (end > size_) end = size_;
-        if (begin < end) size_out = end - begin;
-        return {data_ + begin, size_out};
-    }
-
-    CUDAVectorMutableView<T> mut_view(size_type begin, size_type end)
-    {
-        LongIndex size_out = 0;
-        if (end > size_) end = size_;
-        if (begin < end) size_out = end - begin;
-        return {data_ + begin, size_out};
-    }
-
-
     __host__ __device__ explicit CUDAVector(size_type size = 0) : capacity_(size), size_(size), data_(nullptr)
     {
         if (!size_) return;
@@ -246,6 +215,36 @@ public:
 #ifndef __CUDA_ARCH__
         SPDLOG_TRACE("Done moving vector");
 #endif
+    }
+
+    /**
+ * @brief Make a plain old data structure that can be sent into CUDA kernels.
+ * @return a structure consisting of size and pointer.
+ */
+    __host__ __device__ CUDAVectorView<T> view() const
+    {
+        return {data_, size_};
+    }
+
+    __host__ __device__ CUDAVectorMutableView<T> mut_view()
+    {
+        return {data_, size_};
+    }
+
+    CUDAVectorView<T> view(size_type begin, size_type end) const
+    {
+        LongIndex size_out = 0;
+        if (end > size_) end = size_;
+        if (begin < end) size_out = end - begin;
+        return {data_ + begin, size_out};
+    }
+
+    CUDAVectorMutableView<T> mut_view(size_type begin, size_type end)
+    {
+        LongIndex size_out = 0;
+        if (end > size_) end = size_;
+        if (begin < end) size_out = end - begin;
+        return {data_ + begin, size_out};
     }
 
     // Copy assignment operator.

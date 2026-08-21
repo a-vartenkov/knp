@@ -35,14 +35,14 @@ template<>
 void gpu_insert<ProjectionVariants>(const ProjectionVariants &cpu_source, ProjectionVariants *gpu_target)
 {
     ::cuda::std::visit([gpu_target](const auto &val)
-                       {
-                           using ValueType = std::decay_t<decltype(val)>;
-                           ValueType *buffer;
-                           call_and_check(cudaMalloc(&buffer, sizeof(ValueType)));
-                           gpu_insert(val, buffer);
-                           device_lib::make_variant_kernel<<<1, 1>>>(gpu_target, buffer);
-                           call_and_check(cudaFree(buffer));
-                       }, cpu_source);
+    {
+        using ValueType = std::decay_t<decltype(val)>;
+        ValueType *buffer;
+        call_and_check(cudaMalloc(&buffer, sizeof(ValueType)));
+        gpu_insert(val, buffer);
+        device_lib::make_variant_kernel<<<1, 1>>>(gpu_target, buffer);
+        call_and_check(cudaFree(buffer));
+    }, cpu_source);
 }
 
 
@@ -52,11 +52,11 @@ __global__ void get_projection_uids_kernel(const ProjectionVariants *projection,
                                            cuda::UID *self_uid)
 {
     ::cuda::std::visit([pre_uid, post_uid, self_uid](const auto &proj)
-                       {
-                           *pre_uid = proj.presynaptic_uid_;
-                           *post_uid = proj.postsynaptic_uid_;
-                           *self_uid = proj.uid_;
-                       }, *projection);
+    {
+        *pre_uid = proj.presynaptic_uid_;
+        *post_uid = proj.postsynaptic_uid_;
+        *self_uid = proj.uid_;
+    }, *projection);
 }
 
 

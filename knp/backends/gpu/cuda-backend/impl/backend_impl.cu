@@ -126,14 +126,14 @@ template<>
 void gpu_insert<PopulationVariants>(const PopulationVariants &cpu_source, PopulationVariants *gpu_target)
 {
     ::cuda::std::visit([gpu_target](const auto &val)
-                       {
-                           using ValueType = std::decay_t<decltype(val)>;
-                           ValueType *buffer;
-                           call_and_check(cudaMalloc(&buffer, sizeof(ValueType)));
-                           gpu_insert(val, buffer);
-                           device_lib::make_variant_kernel<<<1, 1>>>(gpu_target, buffer);
-                           call_and_check(cudaFree(buffer));
-                       }, cpu_source);
+    {
+        using ValueType = std::decay_t<decltype(val)>;
+        ValueType *buffer;
+        call_and_check(cudaMalloc(&buffer, sizeof(ValueType)));
+        gpu_insert(val, buffer);
+        device_lib::make_variant_kernel<<<1, 1>>>(gpu_target, buffer);
+        call_and_check(cudaFree(buffer));
+    }, cpu_source);
 }
 
 
@@ -167,9 +167,9 @@ device_lib::CUDAVector<cuda::UID> get_uids_std(const std::vector<VectorData> &en
     for (size_t i = 0; i < entities.size(); ++i)
     {
         ::cuda::std::visit([&result](const auto &entity)
-                   {
-                       result.push_back(entity.uid_);
-                   }, entities[i]);
+        {
+            result.push_back(entity.uid_);
+        }, entities[i]);
     }
     return result;
 }
