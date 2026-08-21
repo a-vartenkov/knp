@@ -220,7 +220,8 @@ public:
             auto id_buf = get_message_buffer<MessageType>().find_message_ids(uid);
             auto res_size = result.size();
             result.resize(res_size + id_buf.size());
-            std::memcpy(result.data() + res_size, id_buf.data(), id_buf.size() * sizeof(device_lib::LongIndex));
+            // std::memcpy(result.data() + res_size, id_buf.data(), id_buf.size() * sizeof(device_lib::LongIndex));
+            std::copy(id_buf.begin(), id_buf.end(), result.begin() + res_size);
         }
         return result;
     }
