@@ -103,6 +103,9 @@ struct ModelDescription
      * @brief Path to directory where trained model will be saved in SONATA format.
      */
     std::filesystem::path model_saving_path_;
+
+    /// A flag to not do the training.
+    bool inference_only_ = false;
 };
 
 

@@ -102,3 +102,11 @@ std::function<knp::core::messaging::SpikeData(knp::core::Step)> make_training_la
 {
     throw std::runtime_error("Not supported neuron type.");
 }
+
+
+/**
+ * @brief Replace wta with projections.
+ * @note We have to do this because AltAI does not support WTA.
+ * @param network Annotated network.
+ */
+void replace_wta_with_projections(AnnotatedNetwork& network);

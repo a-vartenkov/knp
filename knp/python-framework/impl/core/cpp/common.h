@@ -55,8 +55,10 @@
 #include <sstream>
 #include <string>
 #include <vector>
-
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #include <boost/python.hpp>
+#pragma GCC diagnostic pop
 #include <boost/python/implicit.hpp>
 #include <boost/python/iterator.hpp>
 #include <boost/python/object/class_metadata.hpp>
