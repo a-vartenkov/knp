@@ -25,5 +25,9 @@
 #include <spdlog/spdlog.h>
 
 
-#define CUDA_FAST_ERROR_CHECK(error_message) \
-{ auto error = cudaGetLastError(); if (error != cudaSuccess) SPDLOG_ERROR(error_message, cudaGetErrorString(error)); }
+#define CUDA_FAST_ERROR_CHECK(error_message)                    \
+{                                                               \
+    auto error = cudaGetLastError();                            \
+    if (error != cudaSuccess)                                   \
+        SPDLOG_ERROR(error_message, cudaGetErrorString(error)); \
+}

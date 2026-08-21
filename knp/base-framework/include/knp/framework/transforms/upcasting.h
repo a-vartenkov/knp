@@ -21,7 +21,7 @@
 
 #pragma once
 
-#include "network.h"
+#include "knp/framework/network.h"
 
 namespace knp::framework
 {

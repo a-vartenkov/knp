@@ -105,12 +105,6 @@ public:
     explicit CUDAMessageBus(knp::core::MessageEndpoint &external_endpoint) : cpu_endpoint_{external_endpoint}
     {}
 
-private:
-    template<class MessageType>
-    MessageBuffer<MessageType>& get_message_buffer();
-    template<class MessageType>
-    const MessageBuffer<MessageType>& get_message_buffer() const;
-
 public:
     /**
      * @brief Add a subscription to messages of the specified type from senders with given UIDs.
@@ -247,6 +241,13 @@ public:
     SubscriptionContainer& get_subscriptions() { return subscriptions_; }
 
 private:
+
+    template<class MessageType>
+    MessageBuffer<MessageType>& get_message_buffer();
+
+    template<class MessageType>
+    const MessageBuffer<MessageType>& get_message_buffer() const;
+
     /**
      * @brief Send messages to CPU endpoint.
      */

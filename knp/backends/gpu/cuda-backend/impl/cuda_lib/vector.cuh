@@ -477,7 +477,7 @@ public:
 
     __host__ __device__ void erase(iterator begin_iter, iterator end_iter)
     {
-    // Host + device
+        // Host + device
         if (begin_iter < begin() || begin_iter >= end()) return;
         if (end_iter <= begin_iter) return;
         const size_t num_to_remove = ::cuda::std::min(end_iter, end()) - begin_iter;

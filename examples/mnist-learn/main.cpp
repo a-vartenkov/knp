@@ -21,7 +21,7 @@
 
 #include <iostream>
 
-#include <knp/framework/upcasting.h>
+#include "knp/framework/transforms/upcasting.h"
 
 #include "dataset.h"
 #include "evaluate_results.h"

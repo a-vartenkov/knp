@@ -211,11 +211,11 @@ void CUDABackendImpl::load_populations(const knp::backends::gpu::CUDABackend::Po
     for (const auto &population : populations)
     {
         ::std::visit([this](auto &arg)
-                     {
-                         using CPUPopulationType = std::decay_t<decltype(arg)>;
-                         auto pop = CUDAPopulation<typename CPUPopulationType::PopulationNeuronType>(arg);
-                         device_populations_.push_back(pop);
-                     }, population);
+        {
+            using CPUPopulationType = std::decay_t<decltype(arg)>;
+            auto pop = CUDAPopulation<typename CPUPopulationType::PopulationNeuronType>(arg);
+            device_populations_.push_back(pop);
+        }, population);
     }
 
     SPDLOG_DEBUG("All populations loaded.");
@@ -234,20 +234,18 @@ void CUDABackendImpl::load_projections(const knp::backends::gpu::CUDABackend::Pr
     for (const auto &projection : projections)
     {
         ::std::visit([this](auto &arg)
-                     {
-                         using CPUProjectionType = std::decay_t<decltype(arg)>;
+        {
+            using CPUProjectionType = std::decay_t<decltype(arg)>;
 
-                         auto proj = CUDAProjection<typename CPUProjectionType::ProjectionSynapseType>{arg};
+            auto proj = CUDAProjection<typename CPUProjectionType::ProjectionSynapseType>{arg};
             SPDLOG_DEBUG("Pushing back a projection, size before: {}, pointer before: {}, capacity {}",
-                         device_projections_.size(),
-                         reinterpret_cast<void *>(device_projections_.data()),
-                         device_projections_.capacity());
-                         device_projections_.push_back(proj);
+                    device_projections_.size(), reinterpret_cast<void *>(device_projections_.data()),
+                    device_projections_.capacity());
+            device_projections_.push_back(proj);
             CUDA_FAST_ERROR_CHECK("Pushed back {}");
             SPDLOG_DEBUG("Pushed back: size after: {}, pointer after: {}, capacity {}", device_projections_.size(),
-                             reinterpret_cast<void *>(device_projections_.data()), device_projections_.capacity());
-
-                     }, projection);
+                    reinterpret_cast<void *>(device_projections_.data()), device_projections_.capacity());
+        }, projection);
     }
 
     SPDLOG_DEBUG("All projections loaded.");
@@ -262,10 +260,12 @@ void CUDABackendImpl::init()
     for (size_t i = 0; i < device_projections_.size(); ++i)
     {
         const auto [pre_uid, post_uid, this_uid] = ::cuda::std::visit([](auto &proj)
-            {
-                return std::make_tuple(proj.presynaptic_uid_, proj.postsynaptic_uid_, proj.uid_);
-            }, device_projections_[i]);
+        {
+            return std::make_tuple(proj.presynaptic_uid_, proj.postsynaptic_uid_, proj.uid_);
+        }, device_projections_[i]);
+
         if (!cuda::empty_uid(pre_uid)) this->device_message_bus_.subscribe_gpu<cuda::SpikeMessage>(this_uid, {pre_uid});
+
         if (!cuda::empty_uid(post_uid))
         {
             this->device_message_bus_.subscribe_gpu<cuda::SynapticImpactMessage>(post_uid, {this_uid});
@@ -309,23 +309,20 @@ __host__ uint64_t CUDABackendImpl::route_projection_messages(StepIndex step)
     for (size_t i = 0; i < device_projections_.size(); ++i)
     {
         ::cuda::std::visit([this, &sent_message_counter](auto &proj)
-               {
-                   if (proj.message_buf_.impacts_.size())
-                   {
-                       device_message_bus_.send_message(std::move(proj.message_buf_));
-                       // cudaDeviceSynchronize();
-                       proj.message_buf_.impacts_.clear();
-                       ++sent_message_counter;
-                   }
-               }, device_projections_[i]);
+        {
+            if (proj.message_buf_.impacts_.size())
+            {
+                device_message_bus_.send_message(std::move(proj.message_buf_));
+                // cudaDeviceSynchronize();
+                proj.message_buf_.impacts_.clear();
+                ++sent_message_counter;
+            }
+        }, device_projections_[i]);
     }
     cudaDeviceSynchronize();
     SPDLOG_DEBUG("Projections sent {} messages", sent_message_counter);
     return sent_message_counter;
 }
-
-
-
 
 
 __host__ CUDABackendImpl::PopulationIterator CUDABackendImpl::begin_populations()
@@ -402,6 +399,8 @@ __global__ void get_spike_message_data(device_lib::CUDAVectorView<cuda::MessageV
 
 }   // namespace knp::backends::gpu::cuda
 
+
+// TODO: Replace with a loop macro.
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::PopulationVariants);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::ProjectionVariants);
 REGISTER_CUDA_VECTOR_TYPE(knp::backends::gpu::cuda::SynapticImpact);
