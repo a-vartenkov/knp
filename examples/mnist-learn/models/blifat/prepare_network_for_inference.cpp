@@ -57,4 +57,5 @@ void prepare_network_for_inference<knp::neuron_traits::BLIFATNeuron>(
             network.data_.inference_internal_projection_.end())
             network.network_.add_projection(std::move(projection));
     }
+    replace_wta_with_projections(network);
 }

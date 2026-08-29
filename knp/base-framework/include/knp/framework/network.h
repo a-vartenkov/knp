@@ -28,7 +28,7 @@
 #include <knp/core/projection.h>
 #include <knp/framework/coordinates/generator.h>
 #include <knp/framework/projection/connectors.h>
-#include <knp/framework/projection/synapse_parameters_generators.h>
+#include <knp/framework/projection/synapse_generators/synapse_parameters_generators.h>
 #include <knp/neuron-traits/all_traits.h>
 #include <knp/synapse-traits/all_traits.h>
 
@@ -504,6 +504,5 @@ private:
     PopulationContainer populations_;
     ProjectionContainer projections_;
 };
-
 
 }  // namespace knp::framework

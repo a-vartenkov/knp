@@ -26,8 +26,9 @@
 #include "network_functions.h"
 
 
-// Replace WTA mechanisms with direct projection connections as the AltAI neuron model does not natively support WTA operations.
-static void replace_wta_with_projections(AnnotatedNetwork& network)
+// Replace WTA mechanisms with direct projection connections as the AltAI neuron model does not natively support WTA
+// operations.
+void replace_wta_with_projections(AnnotatedNetwork& network)
 {
     for (const auto& wta_data : network.data_.wta_data_)
     {
@@ -55,7 +56,11 @@ static void replace_wta_with_projections(AnnotatedNetwork& network)
 }
 
 
-// Quantize network weights and thresholds to integer range [-255, 255].
+/**
+ * @brief Quantize network, i.e. scale down model to weights in range [-255,255].
+ * @note This is done to simulate AltAI limitations.
+ * @param network Annotated network.
+ */
 static void quantize_network(AnnotatedNetwork& network)
 {
     for (auto proj = network.network_.begin_projections(); proj != network.network_.end_projections(); ++proj)
