@@ -67,10 +67,6 @@ device_lib::CUDAVector<SpikeIndex> calculate_population(
 inline device_lib::CUDAVector<SpikeIndex> calculate_population(
         CUDAPopulation<knp::neuron_traits::SynapticResourceSTDPBLIFATNeuron> &population,
         const CUDAMessageBus& device_message_bus,
-        StepIndex step)
-{
-    SPDLOG_ERROR("The calculate_population function is not implemented for synaptic resource STDP BLIFAT neuron");
-    return device_lib::CUDAVector<SpikeIndex>{};
-}
+        StepIndex step);
 
 } // namespace knp::backends::gpu::cuda

@@ -325,6 +325,20 @@ __host__ uint64_t CUDABackendImpl::route_projection_messages(StepIndex step)
 }
 
 
+__host__ std::vector<size_t> CUDABackendImpl::find_projections_by_type_and_postsynaptic(const cuda::UID &uid,
+                                                                                        size_t type)
+{
+    std::vector<size_t> result;
+    result.reserve(projections_.size());
+    for (size_t i = 0; i < projections_.size(); ++i)
+    {
+        const auto &proj = projections_[i];
+        if (type != proj.index()) continue;
+        if ()
+    }
+}
+
+
 __host__ CUDABackendImpl::PopulationIterator CUDABackendImpl::begin_populations()
 {
     return PopulationIterator{device_populations_.begin()};

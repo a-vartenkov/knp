@@ -80,8 +80,9 @@ auto get_projection_uids(const ProjectionVariants *proj)
 }
 
 
+template <class DeltaLikeSynapse>
 __global__ void calculate_synaptic_impact(
-        const device_lib::CUDAVectorView<CUDAProjection<knp::synapse_traits::DeltaSynapse>::Synapse> synapses,
+        const device_lib::CUDAVectorView<CUDAProjection<knp::synapse_traits::DeltaLikeSynapse>::Synapse> synapses,
         const device_lib::LongIndex *synapse_indices, size_t size, StepIndex current_step,
         device_lib::LongIndex *results, device_lib::LongIndex *send_steps)
 {
@@ -106,8 +107,9 @@ __global__ void calculate_synaptic_impact(
  * @param results synapse indexes, output
  * @param send_steps sending steps, output
  */
+template <class DeltaLikeSynapse>
 __global__ void calculate_impacts_per_spike(
-        const device_lib::CUDAVectorView<CUDAProjection<knp::synapse_traits::DeltaSynapse>::Synapse> synapses,
+        const device_lib::CUDAVectorView<CUDAProjection<DeltaLikeSynapse>::Synapse> synapses,
         device_lib::CUDAVectorView<SpikeIndex> spike_ids, device_lib::IndexView index,
         device_lib::CUDAVectorView<device_lib::LongIndex> start_offsets,
         StepIndex current_step, device_lib::LongIndex *results, device_lib::LongIndex *send_steps)
@@ -127,10 +129,11 @@ __global__ void calculate_impacts_per_spike(
 }
 
 
+template <class DeltaLikeSynapse>
 __global__ void delta_indices_to_impacts_kernel(device_lib::LongIndex *indices_begin,
-                                                device_lib::LongIndex *indices_end,
-                                                cuda::device_lib::CUDAVectorView<CUDAProjection<knp::synapse_traits::DeltaSynapse>::Synapse> synapses,
-                                                SynapticImpact *impacts_out)
+        device_lib::LongIndex *indices_end,
+        cuda::device_lib::CUDAVectorView<CUDAProjection<DeltaLikeSynapse>::Synapse> synapses,
+        SynapticImpact *impacts_out)
 {
     constexpr int data_index = core::SynapseElementAccess::synapse_data;
     constexpr int source_id_index = core::SynapseElementAccess::source_neuron_id;
@@ -149,6 +152,34 @@ __global__ void delta_indices_to_impacts_kernel(device_lib::LongIndex *indices_b
     impact_out.presynaptic_neuron_index_ = ::cuda::std::get<source_id_index>(synapses.data_[synapse_id]);
     impact_out.postsynaptic_neuron_index_ = ::cuda::std::get<target_id_index>(synapses.data_[synapse_id]);
     impacts_out[i] = impact_out;
+}
+
+
+template<>
+void CUDAProjection<knp::synapse_traits::DeltaSynapse>::form_message(StepIndex current_step)
+{
+    auto iter = thrust::upper_bound(thrust::device, sending_steps_.begin(), sending_steps_.end(), current_step);
+    if (iter == sending_steps_.begin())
+    {
+        // message_buf_.impacts_.clear();
+        return;
+    }
+    device_lib::LongIndex num_impacts = iter - sending_steps_.begin();
+
+    SynapticImpact *impacts;
+    auto [num_blocks, num_threads] = device_lib::get_blocks_config(num_impacts);
+    call_and_check(cudaMalloc(&impacts, sizeof(SynapticImpact) * num_impacts));
+    delta_indices_to_impacts_kernel<<<num_blocks, num_threads>>>(impact_indexes_.data(),
+                                                                 impact_indexes_.data() + num_impacts, synapses_.view(),
+                                                                 impacts);
+    MessageHeader header{uid_, current_step};
+    message_buf_.header_ = header;
+    message_buf_.presynaptic_population_uid_ = presynaptic_uid_;
+    message_buf_.postsynaptic_population_uid_ = postsynaptic_uid_;
+    message_buf_.impacts_ = device_lib::CUDAVector<SynapticImpact>{impacts, num_impacts};
+    message_buf_.is_forcing_ = true;
+    sending_steps_.erase(sending_steps_.begin(), sending_steps_.begin() + num_impacts);
+    impact_indexes_.erase(impact_indexes_.begin(), impact_indexes_.begin() + num_impacts);
 }
 
 
@@ -229,6 +260,9 @@ __host__ void calculate_projection(
 }
 
 
+// TODO: This functions are basically a copy of DeltaSynapse functions, we probably want to make them a template.
+
+
 __host__ void calculate_projection(
         CUDAProjection<knp::synapse_traits::AdditiveSTDPDeltaSynapse> &projection,
         const std::vector<device_lib::LongIndex> &message_ids,
@@ -243,6 +277,9 @@ __host__ void calculate_projection(
         const std::vector<device_lib::LongIndex> &message_ids,
         StepIndex step_n)
 {
+    SPDLOG_TRACE("Calculate AdditiveSTDPDelta synapse projection {}.", std::string(projection.get_uid()));
+
+
 }
 
 } // namespace knp::backends::gpu::cuda

@@ -39,10 +39,10 @@
 namespace knp::backends::gpu::cuda
 {
 /**
- * @brief The CUDAProjection class is a definition of a CUDA synapses.
+ * @brief The CUDAProjectionBase class is a definition of a CUDA synapses.
  */
 template <typename SynapseType>
-struct CUDAProjection
+struct CUDAProjectionBase
 {
     /**
      * @brief Type of the projection synapses.
@@ -51,7 +51,7 @@ struct CUDAProjection
     /**
      * @brief Projection of synapses with the specified synapse type.
      */
-    using ProjectionType = CUDAProjection<SynapseType>;
+    using ProjectionType = CUDAProjectionBase<SynapseType>;
     /**
      * @brief Parameters of the specified synapse type.
      */
@@ -63,17 +63,14 @@ struct CUDAProjection
      */
     using Synapse = ::cuda::std::tuple<SynapseParameters, device_lib::LongIndex, device_lib::LongIndex>;
 
-    __host__ __device__ CUDAProjection()
-#if !defined(__CUDA_ARCH__)
-             :  is_locked_(true)
-#endif
-    {}
+    __host__ __device__ CUDAProjectionBase() : is_locked_(true)
+     {}
 
     /**
      * @brief Constructor.
      * @param projection source projection.
      */
-    __host__ explicit CUDAProjection(const knp::core::Projection<SynapseType> &projection)
+    __host__ explicit CUDAProjectionBase(const knp::core::Projection<SynapseType> &projection)
         : uid_(to_gpu_uid(projection.get_uid())),
           presynaptic_uid_(to_gpu_uid(projection.get_presynaptic())),
           postsynaptic_uid_(to_gpu_uid(projection.get_postsynaptic())),
@@ -90,8 +87,10 @@ struct CUDAProjection
             SPDLOG_TRACE("Synapse: weight {} delay {}", ::cuda::std::get<data_index>(out_synapse).weight_,
                          ::cuda::std::get<data_index>(out_synapse).delay_);
         }
-        index_ = device_lib::build_index<SynapseType>(projection);
+        index_ = device_lib::build_index<SynapseType, core::source_neuron_id>(projection);
     }
+
+    virtual ~CUDAProjectionBase() = default;
 
     __host__ __device__ void lock_weights() { is_locked_ = true; }
     __host__ __device__ void unlock_weights() { is_locked_ = false; }
@@ -156,7 +155,7 @@ struct CUDAProjection
     bool is_locked_;
 
     /**
-     * @brief Synapse index for quick neuron to synapse search.
+     * @brief Synapse index for quick presynaptic neuron to synapse search.
      */
     device_lib::ValueIndex index_;
 
@@ -176,5 +175,10 @@ struct CUDAProjection
      */
     SynapticImpactMessage message_buf_;
 };
+
+
+template <class Synapse>
+struct CUDAProjection : public CUDAProjectionBase<Synapse>
+{};
 
 } // namespace knp::backends::gpu::cuda

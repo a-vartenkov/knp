@@ -124,7 +124,20 @@ __host__ CUDAVector<LongIndex> calculate_neuron_scan(const ValueIndex &index,
                                                      const CUDAVectorView<cuda::SpikeIndex> inputs);
 
 
-template <class SynapseType>
+__device__ CUDAVectorView<LongIndex> find_synapses_by_target(device_lib::LongIndex neuron_index,
+                                                             const device_lib::IndexView &synaptic_index)
+{
+    CUDAVectorView<device_lib::LongIndex> result{nullptr, 0};
+    if (index.offsets_.size() == 0 || neuron_index >= index.offsets.size() - 1)
+        return result;
+    LongIndex starting_index = synaptic_index.offsets_[neuron_index];
+    result.size_ = synaptic_index.offsets[neuron_index + 1] - starting_index;
+    result.data_ = synaptic_index.indices_ + starting_index;
+    return result;
+}
+
+
+template <class SynapseType, int position_index>
 __host__ ValueIndex build_index(const knp::core::Projection<SynapseType> &cpu_projection)
 {
     // Build map-based index
@@ -132,7 +145,7 @@ __host__ ValueIndex build_index(const knp::core::Projection<SynapseType> &cpu_pr
     for (size_t i = 0; i < cpu_projection.size(); ++i)
     {
         const auto &synapse = cpu_projection[i];
-        const auto neuron_id = std::get<core::source_neuron_id>(synapse);
+        const auto neuron_id = std::get<position_index>(synapse);
         auto map_iter = buffer.find(neuron_id);
         if (map_iter == buffer.end())
         {

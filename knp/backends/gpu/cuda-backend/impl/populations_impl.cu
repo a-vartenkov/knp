@@ -44,14 +44,6 @@ __global__ void calculate_neurons_pre_impact(device_lib::CUDAVectorMutableView<B
     neuron.postsynaptic_trace_ *= neuron.postsynaptic_trace_decay_;
     neuron.inhibitory_conductance_ *= neuron.inhibitory_conductance_decay_;
 
-    /*
-    if constexpr (has_dopamine_plasticity<BlifatLikeNeuron>())
-    {
-        neuron.dopamine_value_ = 0.0;
-        neuron.is_being_forced_ = false;
-    }
-    */
-
     if (neuron.bursting_phase_ && !--neuron.bursting_phase_)
     {
         neuron.potential_ = neuron.potential_ * neuron.potential_decay_ + neuron.reflexive_weight_;

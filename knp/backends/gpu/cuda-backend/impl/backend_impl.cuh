@@ -69,13 +69,6 @@ using StepIndex = unsigned long long;
 class CUDABackendImpl
 {
 public:
-
-    /**
-     * @brief Map used for message construction. It maps a message to its future output step.
-     */
-    using SynapticMessageQueue = std::unordered_map<StepIndex, core::messaging::SynapticImpactMessage>;
-
-public:
     /**
      * @brief Type of population container.
      */
@@ -182,6 +175,43 @@ public:
     __host__ ProjectionConstIterator end_projections() const;
 
 public:
+    /**
+     * @brief Find projections of a specific type that lead to a specified population.
+     * @param population_uid the UID of a postsynaptic population.
+     * @param type synapse type index.
+     * @return projection indices.
+     */
+    template <class SynapseType>
+    std::vector<LongIndex> find_projections_by_postsynaptic(const knp::core::UID &post_uid, bool exclude_locked) const
+    {
+        using ProjectionType = knp::core::Projection<SynapseType>;
+        static_assert(boost::mp11::mp_contains<SupportedSynapses, SynapseType>::value, "Unsupported synapse type.");
+        std::vector<LongIndex> result;
+        result.reserve(device_projections_.size());
+        constexpr auto type_index = boost::mp11::mp_find<SupportedSynapses, SynapseType>();
+
+        for (size_t i = 0; i < device_projections_.size(); ++i)
+        {
+            if (device_projections_[i].index() != type_index)
+            {
+                continue;
+            }
+
+            const auto &projection = std::get<type_index>(projection_wrap.arg_);
+            if (projection.is_locked() && exclude_locked)
+            {
+                continue;
+            }
+
+            if (proj.get_postsynaptic() == post_uid)
+            {
+                result.push_back(i);
+            }
+        }
+        return result;
+    }
+
+
     /**
      * @brief Remove projections with given UIDs from the backend.
      * @param uids UIDs of projections to remove.
