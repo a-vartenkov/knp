@@ -254,6 +254,16 @@ public:
     __host__ void calculate_projections(StepIndex step);
     __host__ knp::backends::gpu::cuda::CUDAMessageBus &get_message_bus() { return device_message_bus_; }
 
+    __host__ ProjectionVariants& get_projection(device_lib::LongIndex index)
+    {
+        return device_projections_[index];
+    }
+
+    __host__ PopulationVariants& get_populations(device_lib::LongIndex index)
+    {
+        return device_populations_[index];
+    }
+
     void init();
 
 private:

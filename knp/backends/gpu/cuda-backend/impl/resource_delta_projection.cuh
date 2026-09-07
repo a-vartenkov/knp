@@ -1,5 +1,5 @@
 /**
- * @file projection.cuh
+ * @file resource_delta_projection.cuh
  * @brief GPU Synaptic Resource STDP projection implementation.
  * @kaspersky_support A. Vartenkov.
  * @date 24.02.2025
@@ -30,7 +30,7 @@ using RSTDPDeltaSynapse = synapse_traits::SynapticResourceSTDPDeltaSynapse;
 
 
 template<>
-struct CUDAProjection<RSTDPDeltaSynapse> : CUDAProjectionBase<RSTDPDeltaSynapse>
+struct CUDAProjection<RSTDPDeltaSynapse> : public CUDAProjectionBase<RSTDPDeltaSynapse>
 {
     CUDAProjection() : is_locked_(false) {}
 
