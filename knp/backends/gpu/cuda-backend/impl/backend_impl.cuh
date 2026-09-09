@@ -182,11 +182,12 @@ public:
      * @return projection indices.
      */
     template <class SynapseType>
-    std::vector<LongIndex> find_projections_by_postsynaptic(const knp::core::UID &post_uid, bool exclude_locked) const
+    std::vector<device_lib::LongIndex> find_projections_by_postsynaptic(const knp::core::UID &post_uid,
+                                                                        bool exclude_locked) const
     {
         using ProjectionType = knp::core::Projection<SynapseType>;
         static_assert(boost::mp11::mp_contains<SupportedSynapses, SynapseType>::value, "Unsupported synapse type.");
-        std::vector<LongIndex> result;
+        std::vector<device_lib::LongIndex> result;
         result.reserve(device_projections_.size());
         constexpr auto type_index = boost::mp11::mp_find<SupportedSynapses, SynapseType>();
 
@@ -197,13 +198,13 @@ public:
                 continue;
             }
 
-            const auto &projection = std::get<type_index>(projection_wrap.arg_);
+            const auto &projection = std::get<type_index>(device_projections_[i]);
             if (projection.is_locked() && exclude_locked)
             {
                 continue;
             }
 
-            if (proj.get_postsynaptic() == post_uid)
+            if (projection.get_postsynaptic() == post_uid)
             {
                 result.push_back(i);
             }

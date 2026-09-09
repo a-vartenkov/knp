@@ -175,8 +175,9 @@ device_lib::CUDAVector<SpikeIndex> calculate_population(
                                       device_message_bus.all_messages<SynapticImpactMessage>(),
                                       message_ids);
     }
+    SpikeIndex *output_buffer;
     SpikeIndex *output;
-    cudaMalloc(&output, sizeof(SpikeIndex) * population.neurons_.size());
+    cudaMalloc(&output_buffer, sizeof(SpikeIndex) * population.neurons_.size());
     SpikeIndex *counter;
     cudaMalloc(&counter, sizeof(SpikeIndex));
     cudaMemset(counter, 0, sizeof(SpikeIndex));

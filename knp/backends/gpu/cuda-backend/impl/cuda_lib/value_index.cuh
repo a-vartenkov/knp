@@ -127,12 +127,11 @@ __host__ CUDAVector<LongIndex> calculate_neuron_scan(const ValueIndex &index,
 __device__ CUDAVectorView<LongIndex> find_synapses_by_target(device_lib::LongIndex neuron_index,
                                                              const device_lib::IndexView &synaptic_index)
 {
-    CUDAVectorView<device_lib::LongIndex> result{nullptr, 0};
-    if (index.offsets_.size() == 0 || neuron_index >= index.offsets.size() - 1)
-        return result;
-    LongIndex starting_index = synaptic_index.offsets_[neuron_index];
-    result.size_ = synaptic_index.offsets[neuron_index + 1] - starting_index;
-    result.data_ = synaptic_index.indices_ + starting_index;
+    if (synaptic_index.offsets_size_ == 0 || neuron_index >= synaptic_index.offsets_size_ - 1)
+        return {nullptr, 0};
+    LongIndex starting_index = synaptic_index.offsets_ptr_[neuron_index];
+    CUDAVectorView<device_lib::LongIndex> result{synaptic_index.indices_ptr_ + starting_index,
+                                                 synaptic_index.offsets_ptr_[neuron_index + 1] - starting_index};
     return result;
 }
 

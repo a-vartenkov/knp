@@ -70,27 +70,6 @@ __global__ void calculate_neurons_pre_impact(device_lib::CUDAVectorMutableView <
 }
 
 
-template <class Synapse>
-device_lib::CUDAVector<synapse_traits::synapse_parameters <Synapse> *>
-get_all_connected_synapses(CUDABackendImpl::ProjectionContainer &device_projections,
-                           const CUDAVector<LongIndex> &projection_indices, size_t neuron_index)
-{
-    device_lib::CUDAVector<synapse_traits::synapse_parameters < Synapse> *> result;
-    for (auto &projection: projections)
-    {
-        // we need synapses, for each neuron and projection there's a VectorView with synapse ids.
-        auto synapses =
-                projection.get().find_synapses(neuron_index, core::Projection<Synapse>::Search::by_postsynaptic);
-        std::transform(synapses.begin(), synapses.end(), std::back_inserter(result),
-        [&projection](auto const &index)
-        {
-            return std::reference_wrapper(std::get<core::synapse_data>(projection.get()[index]));
-        });
-    }
-    return result;
-}
-
-
 __global__ void calculate_neurons_impacts(device_lib::CUDAVectorMutableView <ResourceBlifatParams> neurons,
                                           device_lib::CUDAVectorView <SynapticImpact> impacts, bool is_forcing)
 {
@@ -368,7 +347,7 @@ __global__ void do_dopamine_plasticity_kernel(SynapsesPerNeurons synapse_pointer
 
 
 device_lib::CUDAVector<SpikeIndex> calculate_population(
-        CUDAPopulation<knp::neuron_traits::SynapticResourceSTDPNeuron> &population, CUDABackendImpl *this_backend,
+        CUDAPopulation<knp::neuron_traits::SynapticResourceSTDPBLIFATNeuron> &population, CUDABackendImpl *this_backend,
         StepIndex step)
 {
     auto [num_blocks_neuro, num_threads_neuro] = device_lib::get_blocks_config(population.neurons_.size());
@@ -424,6 +403,13 @@ device_lib::CUDAVector<SpikeIndex> calculate_population(
             projection_ptr->index_by_postsynaptic_, projection_ptr->synapses_.data());
 
     do_dopamine_plasticity_kernel<<<num_blocks, num_threads>>>(synapses, population, step);
+
+    SpikeIndex size = 0;
+    cudaMemcpy(&size, counter, sizeof(SpikeIndex), cudaMemcpyDeviceToHost);
+    cudaFree(counter);
+
+    return device_lib::CUDAVector<SpikeIndex>{output, size};
+
 }
 
 

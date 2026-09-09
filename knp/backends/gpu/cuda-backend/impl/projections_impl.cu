@@ -82,7 +82,7 @@ auto get_projection_uids(const ProjectionVariants *proj)
 
 template <class DeltaLikeSynapse>
 __global__ void calculate_synaptic_impact(
-        const device_lib::CUDAVectorView<CUDAProjection<knp::synapse_traits::DeltaLikeSynapse>::Synapse> synapses,
+        const device_lib::CUDAVectorView<CUDAProjection<DeltaLikeSynapse>::Synapse> synapses,
         const device_lib::LongIndex *synapse_indices, size_t size, StepIndex current_step,
         device_lib::LongIndex *results, device_lib::LongIndex *send_steps)
 {
@@ -156,7 +156,7 @@ __global__ void delta_indices_to_impacts_kernel(device_lib::LongIndex *indices_b
 
 
 template<>
-void CUDAProjection<knp::synapse_traits::DeltaSynapse>::form_message(StepIndex current_step)
+void CUDAProjectionBase<knp::synapse_traits::DeltaSynapse>::form_message(StepIndex current_step)
 {
     auto iter = thrust::upper_bound(thrust::device, sending_steps_.begin(), sending_steps_.end(), current_step);
     if (iter == sending_steps_.begin())
@@ -184,7 +184,7 @@ void CUDAProjection<knp::synapse_traits::DeltaSynapse>::form_message(StepIndex c
 
 
 template<>
-void CUDAProjection<knp::synapse_traits::DeltaSynapse>::form_message(StepIndex current_step)
+void CUDAProjectionBase<knp::synapse_traits::SynapticResourceSTDPDeltaSynapse>::form_message(StepIndex current_step)
 {
     auto iter = thrust::upper_bound(thrust::device, sending_steps_.begin(), sending_steps_.end(), current_step);
     if (iter == sending_steps_.begin())
@@ -270,16 +270,4 @@ __host__ void calculate_projection(
 {
     //SPDLOG_TRACE("Calculate AdditiveSTDPDelta synapse projection {}.", std::string(projection.get_uid()));
 }
-
-
-__host__ void calculate_projection(
-        CUDAProjection<knp::synapse_traits::SynapticResourceSTDPDeltaSynapse> &projection,
-        const std::vector<device_lib::LongIndex> &message_ids,
-        StepIndex step_n)
-{
-    SPDLOG_TRACE("Calculate AdditiveSTDPDelta synapse projection {}.", std::string(projection.get_uid()));
-
-
-}
-
 } // namespace knp::backends::gpu::cuda
