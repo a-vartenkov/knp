@@ -180,8 +180,8 @@ struct CUDAProjectionBase
 template <class Synapse>
 struct CUDAProjection : public CUDAProjectionBase<Synapse>
 {
-    __host__ explicit CUDAProjection(const knp::core::Projection<SynapseType> &projection)
-            : CUDAProjectionBase<RSTDPDeltaSynapse>(projection)
+    __host__ explicit CUDAProjection(const knp::core::Projection<Synapse> &projection)
+            : CUDAProjectionBase<Synapse>(projection)
     {}
 
     __host__ CUDAProjection() = default;
