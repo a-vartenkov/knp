@@ -68,6 +68,7 @@ knp_add_library("${PROJECT_NAME}"
         impl/cuda_lib/value_index.cu
         impl/projections_impl.cu
         impl/populations_impl.cu
+        impl/resource_blifat_population_impl.cu
         ${${PROJECT_NAME}_headers}
         ${${PROJECT_NAME}_cuda_headers}
     ALIAS KNP::Backends::CUDA

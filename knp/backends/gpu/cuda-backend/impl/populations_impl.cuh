@@ -33,7 +33,8 @@
  */
 namespace knp::backends::gpu::cuda
 {
-using SupportedNeurons = boost::mp11::mp_list<knp::neuron_traits::BLIFATNeuron>;
+using SupportedNeurons = boost::mp11::mp_list<knp::neuron_traits::BLIFATNeuron,
+                                              knp::neuron_traits::SynapticResourceSTDPBLIFATNeuron>;
 using SupportedPopulations = boost::mp11::mp_transform<CUDAPopulation, SupportedNeurons>;
 /**
  * @brief Population variant that contains any population type specified in `SupportedPopulations`.
@@ -64,7 +65,7 @@ device_lib::CUDAVector<SpikeIndex> calculate_population(
  * @param step current step.
  * @return set of spiked neuron indices.
  */
-inline device_lib::CUDAVector<SpikeIndex> calculate_population(
+device_lib::CUDAVector<SpikeIndex> calculate_population(
         CUDAPopulation<knp::neuron_traits::SynapticResourceSTDPBLIFATNeuron> &population,
         const CUDAMessageBus& device_message_bus,
         StepIndex step);

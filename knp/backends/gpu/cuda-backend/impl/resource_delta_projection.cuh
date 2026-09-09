@@ -32,9 +32,12 @@ using RSTDPDeltaSynapse = synapse_traits::SynapticResourceSTDPDeltaSynapse;
 template<>
 struct CUDAProjection<RSTDPDeltaSynapse> : public CUDAProjectionBase<RSTDPDeltaSynapse>
 {
-    CUDAProjection() : is_locked_(false) {}
+    CUDAProjection()
+    {
+        is_locked_ = false;
+    }
 
-    __host__ explicit CUDAProjection(const knp::core::Projection<SynapseType> &projection)
+    __host__ explicit CUDAProjection(const knp::core::Projection<RSTDPDeltaSynapse> &projection)
         : CUDAProjectionBase<RSTDPDeltaSynapse>(projection)
     {
         index_by_postsynaptic_ = device_lib::build_index<RSTDPDeltaSynapse, core::target_neuron_id>(projection);

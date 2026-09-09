@@ -123,8 +123,8 @@ __global__ void calculate_impacts_per_spike(
     const device_lib::LongIndex output_start = start_offsets.data_[i];
     const auto [num_blocks, num_threads] = device_lib::get_blocks_config(size);
     // printf("Calc impacts: start %lu, size %lu, out_start %lu\n", start, size, output_start);
-    calculate_synaptic_impact<<<num_blocks, num_threads>>>(synapses, index.indices_ptr_ + start, size, current_step,
-                                                           results + output_start, send_steps + output_start);
+    calculate_synaptic_impact<DeltaLikeSynapse><<<num_blocks, num_threads>>>(synapses, index.indices_ptr_ + start, size,
+            current_step, results + output_start, send_steps + output_start);
     __syncthreads(); // TODO TEMP
 }
 
@@ -186,6 +186,7 @@ void CUDAProjectionBase<knp::synapse_traits::DeltaSynapse>::form_message(StepInd
 template<>
 void CUDAProjectionBase<knp::synapse_traits::SynapticResourceSTDPDeltaSynapse>::form_message(StepIndex current_step)
 {
+    using Synapse = knp::synapse_traits::SynapticResourceSTDPDeltaSynapse;
     auto iter = thrust::upper_bound(thrust::device, sending_steps_.begin(), sending_steps_.end(), current_step);
     if (iter == sending_steps_.begin())
     {
@@ -197,9 +198,8 @@ void CUDAProjectionBase<knp::synapse_traits::SynapticResourceSTDPDeltaSynapse>::
     SynapticImpact *impacts;
     auto [num_blocks, num_threads] = device_lib::get_blocks_config(num_impacts);
     call_and_check(cudaMalloc(&impacts, sizeof(SynapticImpact) * num_impacts));
-    delta_indices_to_impacts_kernel<<<num_blocks, num_threads>>>(impact_indexes_.data(),
-                                                                 impact_indexes_.data() + num_impacts, synapses_.view(),
-                                                                 impacts);
+    delta_indices_to_impacts_kernel<Synapse><<<num_blocks, num_threads>>>(impact_indexes_.data(),
+            impact_indexes_.data() + num_impacts, synapses_.view(), impacts);
     MessageHeader header{uid_, current_step};
     message_buf_.header_ = header;
     message_buf_.presynaptic_population_uid_ = presynaptic_uid_;
