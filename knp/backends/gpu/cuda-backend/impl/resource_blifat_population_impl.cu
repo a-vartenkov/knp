@@ -45,18 +45,14 @@ __global__ void calculate_neurons_pre_impact(device_lib::CUDAVectorMutableView <
 {
     const size_t neuron_index = blockIdx.x * blockDim.x + threadIdx.x;
     if (neuron_index >= neurons.size_) return;
-
-    BlifatParams &neuron = neurons.data_[neuron_index];
+    ResourceBlifatParams &neuron = neurons.data_[neuron_index];
     ++neuron.n_time_steps_since_last_firing_;
     neuron.dynamic_threshold_ *= neuron.threshold_decay_;
     neuron.postsynaptic_trace_ *= neuron.postsynaptic_trace_decay_;
     neuron.inhibitory_conductance_ *= neuron.inhibitory_conductance_decay_;
 
-    if constexpr(has_dopamine_plasticity<BlifatLikeNeuron>())
-    {
-        neuron.dopamine_value_ = 0.0;
-        neuron.is_being_forced_ = false;
-    }
+    neuron.dopamine_value_ = 0.0;
+    neuron.is_being_forced_ = false;
 
     if (neuron.bursting_phase_ && !--neuron.bursting_phase_)
     {
@@ -109,7 +105,7 @@ __host__ void calculate_neurons_impacts_all(device_lib::CUDAVectorMutableView <R
     {
         const auto &msg = messages_all[msg_id];
         auto [num_blocks, num_threads] = device_lib::get_blocks_config(msg.impacts_.size());
-        calculate_neurons_impacts<<<num_blocks, num_threads>>>(neurons, msg.impacts_.view());
+        calculate_neurons_impacts<<<num_blocks, num_threads>>>(neurons, msg.impacts_.view(), msg.is_forcing_);
     }
     cudaDeviceSynchronize();
 }
@@ -176,11 +172,11 @@ __global__ void calculate_neurons_post_impact(device_lib::CUDAVectorMutableView 
 template<class Synapse>
 struct SynapsesPerNeurons
 {
-    LongIndex offsets_size_;
-    LongIndex *offsets_;
+    device_lib::LongIndex offsets_size_;
+    device_lib::LongIndex *offsets_;
 
     knp::synapse_traits::synapse_parameters<Synapse> *synapses_;
-    LongIndex synapses_size_;
+    device_lib::LongIndex synapses_size_;
 };
 
 
@@ -189,46 +185,47 @@ __global__ void index_to_pointer(device_lib::IndexView synapse_index,
         knp::synapse_traits::synapse_parameters<Synapse> *start,
         knp::synapse_traits::synapse_parameters<Synapse> **output)
 {
-    const device_lib::LongIndex synapse_index = blockIdx.x * blockDim.x + threadIdx.x;
-    if (synapse_index >= synapse_index.indices_size_) return;
-    output[neuron_index] = start + synapse_index;
+    const device_lib::LongIndex synapse_id = blockIdx.x * blockDim.x + threadIdx.x;
+    if (synapse_id >= synapse_index.indices_size_) return;
+    output[synapse_id] = start + synapse_index;
 }
 
 
-__device__ CUDAVectorMutableView<ResourceSynapseParams> extract_synapses_from_index(
+__device__ device_lib::CUDAVectorMutableView<ResourceSynapseParams> extract_synapses_from_index(
         SynapsesPerNeurons<ResourceSynapseType> &synapse_index, device_lib::LongIndex neuron_index)
 {
-    assert(synapse_pointer_index.offsets_size_ > 0);
-    device_lib::LongIndex offset = synapse_pointer_index.offsets_[neuron_id];
-    device_lib::LongIndex size = synapse_pointer_index.offsets_[neuron_id + 1] - offset;
-    return VectorMutableView{synapse_pointer_index.synapses_ + offset, size};
+    assert(synapse_index.offsets_size_ > 0);
+    device_lib::LongIndex offset = synapse_index.offsets_[neuron_index];
+    device_lib::LongIndex size = synapse_index.offsets_[neuron_index + 1] - offset;
+    return device_lib::CUDAVectorMutableView<ResourceSynapseParams>{synapse_index.synapses_ + offset, size};
 }
 
 
 template<class Synapse>
-__host__ SynapsesPerNeurons initialize_synapses_per_neurons(const device_lib::IndexView &synapse_index,
+__host__ SynapsesPerNeurons<Synapse> initialize_synapses_per_neurons(
+        const device_lib::IndexView &synapse_index,
         const knp::synapse_traits::synapse_parameters<Synapse> *start)
 {
     SynapsesPerNeurons<Synapse> result;
-    call_and_check(cudaMalloc(&result.offsets_, sizeof(LongIndex) * synapse_index.offsets_size_));
-    call_and_check(cudaMalloc(&result.synapses_, sizeof(LongIndex) * synapse_index.offsets_size_));
+    call_and_check(cudaMalloc(&result.offsets_, sizeof(device_lib::LongIndex) * synapse_index.offsets_size_));
+    call_and_check(cudaMalloc(&result.synapses_, sizeof(device_lib::LongIndex) * synapse_index.offsets_size_));
     // TODO static_assert(is_same_type(SynapsesPerNeurons::synapses_, ValueIndexView::offsets_))
-    cudaMemcpy(result.offsets_, synapse_index.offsets_ptr_, sizeof(LongIndex) * synapse_index.offsets_size_,
+    cudaMemcpy(result.offsets_, synapse_index.offsets_ptr_, sizeof(device_lib::LongIndex) * synapse_index.offsets_size_,
                cudaMemcpyDeviceToDevice);
     result.offsets_size_ = synapse_index.offsets_size_;
     result.synapses_size_ = synapse_index.indices_size_;
     cudaMalloc(result.synapses_, sizeof(void *) * synapse_index.indices_size_);
-    auto [num_blocks, num_threads] = get_blocks_config(synapse_index.indices_size_);
+    auto [num_blocks, num_threads] = device_lib::get_blocks_config(synapse_index.indices_size_);
     index_to_pointer<<<num_blocks, num_threads>>>(synapse_index, start, &result.synapses_);
 }
 
 
 // TODO: Merge synapses pointers
-__host__ SynapsesPerNeurons merge_synapses_per_neurons(const knp::SynapsesPerNeurons **synapses_array)
-{
-    // result.offsets[i] = sum(array.offsets[i])
-    // result.synapses[offsets[i]] = concat(array.synapses[array[i].offsets[i] : array[i].offsets[i + 1]])
-}
+//__host__ SynapsesPerNeurons merge_synapses_per_neurons(const SynapsesPerNeurons **synapses_array)
+//{
+//    // result.offsets[i] = sum(array.offsets[i])
+//    // result.synapses[offsets[i]] = concat(array.synapses[array[i].offsets[i] : array[i].offsets[i + 1]])
+//}
 
 
 __device__ void recalculate_synapse_weight(ResourceSynapseParams &synapse_params)
@@ -236,7 +233,7 @@ __device__ void recalculate_synapse_weight(ResourceSynapseParams &synapse_params
     const auto &rule = synapse_params.rule_;
     const auto syn_w = std::max(rule.synaptic_resource_, 0.F);
     const auto weight_diff = rule.w_max_ - rule.w_min_;
-    synapse.weight_ = rule.w_min_ + weight_diff * syn_w / (weight_diff + syn_w);
+    synapse_params.weight_ = rule.w_min_ + weight_diff * syn_w / (weight_diff + syn_w);
 }
 
 
@@ -246,25 +243,25 @@ __global__ void add_resource_to_synapses(device_lib::CUDAVectorMutableView<Resou
     const device_lib::LongIndex synapse_id = blockIdx.x * blockDim.x + threadIdx.x;
     if (synapse_id >= synapses.size_) return;
     auto &synapse = synapses.data_[synapse_id];
-    synapse.get().rule_.synaptic_resource_ += add_resource_value;
+    synapse.rule_.synaptic_resource_ += add_resource_value;
     recalculate_synapse_weight(synapse);
 }
 
 
 __device__ void renormalize_resource(device_lib::CUDAVectorMutableView<ResourceSynapseParams> synapses,
-                                     ResourceBlifatParams &neuron)
+                                     ResourceBlifatParams &neuron, StepIndex step)
 {
     const device_lib::LongIndex neuron_id = blockIdx.x * blockDim.x + threadIdx.x;
     if (step - neuron.last_step_ <= neuron.isi_max_ &&
             neuron.isi_status_ != neuron_traits::ISIPeriodType::is_forced)
     {
         // Neuron is still in ISI period, skip it.
-        continue;
+        return;
     }
 
     if (::cuda::std::fabs(neuron.free_synaptic_resource_) < neuron.synaptic_resource_threshold_)
     {
-        continue;
+        return;
     }
 
     // Divide free resource between all synapses.
@@ -272,7 +269,7 @@ __device__ void renormalize_resource(device_lib::CUDAVectorMutableView<ResourceS
             neuron.free_synaptic_resource_ / (synapse_params.size() + neuron.resource_drain_coefficient_);
 
     neuron.free_synaptic_resource_ = 0.0F;
-    auto [num_blocks, num_threads] = get_blocks_config(synapses.size_);
+    auto [num_blocks, num_threads] = device_lib::get_blocks_config(synapses.size_);
     add_resource_to_synapses<<<num_blocks, num_threads>>>(synapses, add_resource_value);
 }
 
@@ -305,7 +302,7 @@ __device__ void do_dopamine_plasticity_device(
         device_lib::CUDAVectorMutableView <knp::synapse_traits::synapse_parameters<Synapse>> synapses,
         ResourceBlifatParams &neuron)
 {
-    auto [num_blocks, num_threads] = get_blocks_config(synapses.size_);
+    auto [num_blocks, num_threads] = device_lib::get_blocks_config(synapses.size_);
     do_dopamine_plasticity_synapse_kernel<<<num_blocks, num_threads>>>(synapses, &neuron);
     __syncthreads();
 
@@ -330,7 +327,7 @@ __device__ void do_dopamine_plasticity_device(
 // Как должно работать:
 // Вначале мы находим для всех нейронов связанные с ними синапсы. Это входной параметр, который SynapsesPerNeurons
 __global__ void do_dopamine_plasticity_kernel(SynapsesPerNeurons synapse_pointer_index,
-                                              device_lib::CUDAVectorMutableView <ResourceBlifatParams> neurons)
+                                              device_lib::CUDAVectorMutableView<ResourceBlifatParams> neurons, step)
 {
     using SynapseType = knp::synapse_traits::SynapticResourceSTDPDeltaSynapse;
     using SynapseParamType = knp::synapse_traits::synapse_parameters<SynapseType>;
@@ -342,7 +339,7 @@ __global__ void do_dopamine_plasticity_kernel(SynapsesPerNeurons synapse_pointer
     if (synapse_pointer_index.offsets_size_ == 0 || neuron_id >= synapse_pointer_index.offsets_size_ - 1) return;
     do_dopamine_plasticity_device(extract_synapses_from_index(synapse_pointer_index, neuron_id),
                                   neurons.data_[neuron_id]);
-    renormalize_resource(extract_synapses_from_index(synapse_pointer_index, neuron_id), neurons.data_[neuron_id]);
+    renormalize_resource(extract_synapses_from_index(synapse_pointer_index, neuron_id), neurons.data_[neuron_id], step);
 }
 
 
@@ -391,15 +388,15 @@ device_lib::CUDAVector<SpikeIndex> calculate_population(
     // Let's start with the result. The result is: a long list of synapse pointer and a shorter list of offsets per
     // neuron. We can make one of those per projection, easily.
 
-    auto [num_blocks, num_threads] = get_blocks_config(population.neurons_.size());
-    auto &projection_var = this_backend->projections working_projection_indices[0];
+    auto [num_blocks, num_threads] = device_lib::get_blocks_config(population.neurons_.size());
+    auto &projection_var = this_backend->get_projections[working_projection_indices[0]];
     ResourceProjection *projection_ptr = ::cuda::std::get_if<ResourceProjection>(projection_var);
     if (!projection_ptr)
     {
         SPDLOG_ERROR("Wrong projection type when extracting");
         throw std::runtime_error("Wrong type of projection extraction");
     }
-    SynapsesPerNeuron synapses = initialize_synapses_per_neurons<ResourceSynapseType>(
+    SynapsesPerNeurons synapses = initialize_synapses_per_neurons<ResourceSynapseType>(
             projection_ptr->index_by_postsynaptic_, projection_ptr->synapses_.data());
 
     do_dopamine_plasticity_kernel<<<num_blocks, num_threads>>>(synapses, population, step);
