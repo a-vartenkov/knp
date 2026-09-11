@@ -277,18 +277,18 @@ __device__ void renormalize_resource(device_lib::CUDAVectorMutableView<ResourceS
 template <class Synapse>
 __global__ void do_dopamine_plasticity_synapse_kernel(
         device_lib::CUDAVectorMutableView<knp::synapse_traits::synapse_parameters<Synapse>> synapses,
-        ResourceBlifatParams *neuron, step)
+        ResourceBlifatParams *neuron, StepIndex step)
 {
     const device_lib::LongIndex synapse_id = blockIdx.x * blockDim.x + threadIdx.x;
     if (synapse_id >= synapses.size_) return;
 
     auto &synapse = synapses.data_[synapse_id];
-    if (step - neuron->last_spike_step_ <= neuron.dopamine_plasticity_time_ &&
+    if (step - neuron->last_spike_step_ <= neuron->dopamine_plasticity_time_ &&
         synapse.get().rule_.has_contributed_)
     {
         // Change synapse resource.
         float resource_change =
-                neuron.dopamine_value_ * std::min(static_cast<float>(std::pow(2, -neuron.stability_)), 1.F);
+                neuron->dopamine_value_ * std::min(static_cast<float>(std::pow(2, -neuron->stability_)), 1.F);
 
         synapse.get().rule_.synaptic_resource_ += resource_change;
         atomicAdd(&neuron->free_synaptic_resource_, -resource_change);
@@ -300,7 +300,7 @@ __global__ void do_dopamine_plasticity_synapse_kernel(
 template<class Synapse>
 __device__ void do_dopamine_plasticity_device(
         device_lib::CUDAVectorMutableView <knp::synapse_traits::synapse_parameters<Synapse>> synapses,
-        ResourceBlifatParams &neuron, step)
+        ResourceBlifatParams &neuron, StepIndex step)
 {
     auto [num_blocks, num_threads] = device_lib::get_blocks_config(synapses.size_);
     do_dopamine_plasticity_synapse_kernel<<<num_blocks, num_threads>>>(synapses, &neuron, step);
@@ -368,11 +368,11 @@ device_lib::CUDAVector<SpikeIndex> calculate_population(
                                                                            counter);
 
     std::vector<device_lib::LongIndex> working_projection_indices = this_backend->find_projections_by_postsynaptic<
-            synapse_traits::SynapticResourceSTDPDeltaSynapse>(population.get_uid());
+            synapse_traits::SynapticResourceSTDPDeltaSynapse>(population.uid_, true);
     if (working_projection_indices.size() == 0)
     {
         SPDLOG_WARN("No working projections found for a population");
-        return {};
+        return device_lib::CUDAVector<SpikeIndex>{};
     }
 
     using ResourceProjection = CUDAProjection<synapse_traits::SynapticResourceSTDPDeltaSynapse>;
@@ -387,17 +387,17 @@ device_lib::CUDAVector<SpikeIndex> calculate_population(
     // neuron. We can make one of those per projection, easily.
 
     auto [num_blocks, num_threads] = device_lib::get_blocks_config(population.neurons_.size());
-    auto &projection_var = this_backend->get_projections[working_projection_indices[0]];
+    auto &projection_var = this_backend->get_projection(working_projection_indices[0]);
     ResourceProjection *projection_ptr = ::cuda::std::get_if<ResourceProjection>(projection_var);
     if (!projection_ptr)
     {
         SPDLOG_ERROR("Wrong projection type when extracting");
         throw std::runtime_error("Wrong type of projection extraction");
     }
-    SynapsesPerNeurons synapses = initialize_synapses_per_neurons<ResourceSynapseType>(
+    SynapsesPerNeurons<ResourceSynapseType> synapses = initialize_synapses_per_neurons<ResourceSynapseType>(
             projection_ptr->index_by_postsynaptic_, projection_ptr->synapses_.data());
 
-    do_dopamine_plasticity_kernel<<<num_blocks, num_threads>>>(synapses, population, step);
+    do_dopamine_plasticity_kernel<<<num_blocks, num_threads>>>(synapses, population.neurons_.mut_view(), step);
 
     SpikeIndex size = 0;
     cudaMemcpy(&size, counter, sizeof(SpikeIndex), cudaMemcpyDeviceToHost);

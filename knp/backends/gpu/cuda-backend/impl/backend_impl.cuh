@@ -260,7 +260,7 @@ public:
         return device_projections_[index];
     }
 
-    __host__ PopulationVariants& get_populations(device_lib::LongIndex index)
+    __host__ PopulationVariants& get_population(device_lib::LongIndex index)
     {
         return device_populations_[index];
     }
