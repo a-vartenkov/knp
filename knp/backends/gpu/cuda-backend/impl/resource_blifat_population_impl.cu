@@ -266,7 +266,7 @@ __device__ void renormalize_resource(device_lib::CUDAVectorMutableView<ResourceS
 
     // Divide free resource between all synapses.
     auto add_resource_value =
-            neuron.free_synaptic_resource_ / (synapse_params.size() + neuron.resource_drain_coefficient_);
+            neuron.free_synaptic_resource_ / (synapses.size_ + neuron.resource_drain_coefficient_);
 
     neuron.free_synaptic_resource_ = 0.0F;
     auto [num_blocks, num_threads] = device_lib::get_blocks_config(synapses.size_);
@@ -274,10 +274,10 @@ __device__ void renormalize_resource(device_lib::CUDAVectorMutableView<ResourceS
 }
 
 
-template <Synapse>
+template <class Synapse>
 __global__ void do_dopamine_plasticity_synapse_kernel(
         device_lib::CUDAVectorMutableView<knp::synapse_traits::synapse_parameters<Synapse>> synapses,
-        ResourceBlifatParams *neuron)
+        ResourceBlifatParams *neuron, step)
 {
     const device_lib::LongIndex synapse_id = blockIdx.x * blockDim.x + threadIdx.x;
     if (synapse_id >= synapses.size_) return;
@@ -297,13 +297,13 @@ __global__ void do_dopamine_plasticity_synapse_kernel(
 }
 
 
-template<Synapse>
+template<class Synapse>
 __device__ void do_dopamine_plasticity_device(
         device_lib::CUDAVectorMutableView <knp::synapse_traits::synapse_parameters<Synapse>> synapses,
-        ResourceBlifatParams &neuron)
+        ResourceBlifatParams &neuron, step)
 {
     auto [num_blocks, num_threads] = device_lib::get_blocks_config(synapses.size_);
-    do_dopamine_plasticity_synapse_kernel<<<num_blocks, num_threads>>>(synapses, &neuron);
+    do_dopamine_plasticity_synapse_kernel<<<num_blocks, num_threads>>>(synapses, &neuron, step);
     __syncthreads();
 
     if (neuron.is_being_forced_ || neuron.dopamine_value_ < 0)
@@ -323,11 +323,9 @@ __device__ void do_dopamine_plasticity_device(
 }
 
 
-// Ядро для проверки
-// Как должно работать:
-// Вначале мы находим для всех нейронов связанные с ними синапсы. Это входной параметр, который SynapsesPerNeurons
-__global__ void do_dopamine_plasticity_kernel(SynapsesPerNeurons synapse_pointer_index,
-                                              device_lib::CUDAVectorMutableView<ResourceBlifatParams> neurons, step)
+__global__ void do_dopamine_plasticity_kernel(SynapsesPerNeurons<ResourceSynapseType> synapse_pointer_index,
+                                              device_lib::CUDAVectorMutableView<ResourceBlifatParams> neurons,
+                                              StepIndex step)
 {
     using SynapseType = knp::synapse_traits::SynapticResourceSTDPDeltaSynapse;
     using SynapseParamType = knp::synapse_traits::synapse_parameters<SynapseType>;
@@ -338,7 +336,7 @@ __global__ void do_dopamine_plasticity_kernel(SynapsesPerNeurons synapse_pointer
     // Check that it's not an unconnected "extra" neuron.
     if (synapse_pointer_index.offsets_size_ == 0 || neuron_id >= synapse_pointer_index.offsets_size_ - 1) return;
     do_dopamine_plasticity_device(extract_synapses_from_index(synapse_pointer_index, neuron_id),
-                                  neurons.data_[neuron_id]);
+                                  neurons.data_[neuron_id], step);
     renormalize_resource(extract_synapses_from_index(synapse_pointer_index, neuron_id), neurons.data_[neuron_id], step);
 }
 
