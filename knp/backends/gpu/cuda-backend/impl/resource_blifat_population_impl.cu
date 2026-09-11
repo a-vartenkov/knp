@@ -388,7 +388,8 @@ device_lib::CUDAVector<SpikeIndex> calculate_population(
 
     auto [num_blocks, num_threads] = device_lib::get_blocks_config(population.neurons_.size());
     auto &projection_var = this_backend->get_projection(working_projection_indices[0]);
-    ResourceProjection *projection_ptr = ::cuda::std::get_if<ResourceProjection>(projection_var);
+    constexpr int type_index = boost::mp11::mp_find<SupportedSynapses, ResourceSynapseType>();
+    ResourceProjection *projection_ptr = ::cuda::std::get_if<type_index>(&projection_var);
     if (!projection_ptr)
     {
         SPDLOG_ERROR("Wrong projection type when extracting");

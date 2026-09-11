@@ -36,6 +36,7 @@
 
 #include "backend_impl.cuh"
 #include "projection.cuh"
+#include "resource_delta_projection.cuh"
 #include "population.cuh"
 
 #include "cuda_lib/fast_error_check.cuh"

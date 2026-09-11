@@ -23,6 +23,7 @@
 
 #include "cuda_bus/message_bus.cuh"
 #include "projection.cuh"
+#include "resource_delta_projection.cuh"
 #include <boost/mp11.hpp>
 #include <cuda_runtime.h>
 

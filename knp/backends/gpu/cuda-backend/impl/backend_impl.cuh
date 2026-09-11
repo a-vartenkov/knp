@@ -182,7 +182,7 @@ public:
      * @return projection indices.
      */
     template <class SynapseType>
-    std::vector<device_lib::LongIndex> find_projections_by_postsynaptic(const knp::core::UID &post_uid,
+    std::vector<device_lib::LongIndex> find_projections_by_postsynaptic(const cuda::UID &post_uid,
                                                                         bool exclude_locked) const
     {
         using ProjectionType = knp::core::Projection<SynapseType>;
@@ -204,7 +204,7 @@ public:
                 continue;
             }
 
-            if (projection.get_postsynaptic() == post_uid)
+            if (projection.postsynaptic_uid_ == post_uid)
             {
                 result.push_back(i);
             }

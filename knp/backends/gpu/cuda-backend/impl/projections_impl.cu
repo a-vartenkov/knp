@@ -21,6 +21,7 @@
 
 #include "projections_impl.cuh"
 #include "projection.cuh"
+#include "resource_delta_projection.cuh"
 #include <cuda_runtime.h>
 #include <thrust/binary_search.h>
 #include <thrust/sort.h>
