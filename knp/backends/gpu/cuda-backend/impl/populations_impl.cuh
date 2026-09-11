@@ -21,7 +21,6 @@
 
 #pragma once
 
-#include "cuda_bus/message_bus.cuh"
 #include "cuda_lib/vector.cuh"
 #include "population.cuh"
 #include <boost/mp11.hpp>
@@ -33,6 +32,8 @@
  */
 namespace knp::backends::gpu::cuda
 {
+class CUDABackendImpl;
+
 using SupportedNeurons = boost::mp11::mp_list<knp::neuron_traits::BLIFATNeuron,
                                               knp::neuron_traits::SynapticResourceSTDPBLIFATNeuron>;
 using SupportedPopulations = boost::mp11::mp_transform<CUDAPopulation, SupportedNeurons>;
@@ -56,7 +57,7 @@ using StepIndex = unsigned long long;
  * @return set of spiked neuron indices.
  */
 device_lib::CUDAVector<SpikeIndex> calculate_population(
-        CUDAPopulation<knp::neuron_traits::BLIFATNeuron> &population, const CUDAMessageBus& device_message_bus,
+        CUDAPopulation<knp::neuron_traits::BLIFATNeuron> &population, CUDABackendImpl *this_backend,
         StepIndex step);
 
 /**
@@ -67,7 +68,7 @@ device_lib::CUDAVector<SpikeIndex> calculate_population(
  */
 device_lib::CUDAVector<SpikeIndex> calculate_population(
         CUDAPopulation<knp::neuron_traits::SynapticResourceSTDPBLIFATNeuron> &population,
-        const CUDAMessageBus& device_message_bus,
+        CUDABackendImpl *this_backend,
         StepIndex step);
 
 } // namespace knp::backends::gpu::cuda

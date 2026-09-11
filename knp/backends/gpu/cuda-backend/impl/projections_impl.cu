@@ -262,6 +262,53 @@ __host__ void calculate_projection(
 }
 
 
+__host__ void calculate_projection(
+        CUDAProjection<knp::synapse_traits::SynapticResourceSTDPDeltaSynapse> &projection,
+        const CUDAMessageBus &device_message_bus,
+        const std::vector<device_lib::LongIndex> &message_ids,
+        StepIndex step_n)
+{
+    using Synapse = knp::synapse_traits::SynapticResourceSTDPDeltaSynapse;
+    const auto &messages = device_message_bus.all_messages<SpikeMessage>();
+    for (size_t i = 0; i < message_ids.size(); ++i)
+    {
+        const device_lib::LongIndex msg_index = message_ids[i];
+        const size_t data_size = messages[msg_index].neuron_indexes_.size();
+        auto msg_data_pointer_cpu = messages[msg_index].neuron_indexes_.data();
+        SPDLOG_TRACE("Got message data: pointer {}, size {}", reinterpret_cast<const void*>(msg_data_pointer_cpu),
+                     data_size);
+
+        if (data_size)
+        {
+            device_lib::LongIndex impacts_count = count_values_by_indexes(projection.index_,
+                                                                          device_lib::CUDAVectorView<SpikeIndex>{msg_data_pointer_cpu, data_size});
+
+            device_lib::LongIndex *impacts_buffer;
+            device_lib::LongIndex *delay_buffer;
+            call_and_check(cudaMalloc(&impacts_buffer, sizeof(device_lib::LongIndex) * impacts_count));
+            call_and_check(cudaMalloc(&delay_buffer, sizeof(device_lib::LongIndex) * impacts_count));
+
+            // 2. For each active synapse calculate its impact.
+            auto [num_blocks, num_threads] = device_lib::get_blocks_config(data_size);
+            auto output_start_indices = device_lib::calculate_neuron_scan(projection.index_,
+                                                                          device_lib::CUDAVectorView<SpikeIndex>{msg_data_pointer_cpu, data_size});
+
+            calculate_impacts_per_spike<Synapse><<<num_blocks, num_threads>>>(projection.synapses_.view(),
+                                                                              device_lib::CUDAVectorView<SpikeIndex>{msg_data_pointer_cpu, data_size}, projection.index_.view(),
+                                                                              output_start_indices.view(), step_n, impacts_buffer, delay_buffer);
+
+            cudaDeviceSynchronize();
+            // 3. Sort impacts by time
+            thrust::sort_by_key(thrust::device, delay_buffer, delay_buffer + impacts_count, impacts_buffer);
+            projection.add_impacts(device_lib::CUDAVector<device_lib::LongIndex>{impacts_buffer, impacts_count},
+                                   device_lib::CUDAVector<device_lib::LongIndex>{delay_buffer, impacts_count});
+        }
+        // Make messages
+        projection.form_message(step_n);
+    }
+}
+
+
 // TODO: This functions are basically a copy of DeltaSynapse functions, we probably want to make them a template.
 
 

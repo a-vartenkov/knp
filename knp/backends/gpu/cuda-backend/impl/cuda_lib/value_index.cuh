@@ -124,16 +124,16 @@ __host__ CUDAVector<LongIndex> calculate_neuron_scan(const ValueIndex &index,
                                                      const CUDAVectorView<cuda::SpikeIndex> inputs);
 
 
-__device__ CUDAVectorView<LongIndex> find_synapses_by_target(device_lib::LongIndex neuron_index,
-                                                             const device_lib::IndexView &synaptic_index)
-{
-    if (synaptic_index.offsets_size_ == 0 || neuron_index >= synaptic_index.offsets_size_ - 1)
-        return {nullptr, 0};
-    LongIndex starting_index = synaptic_index.offsets_ptr_[neuron_index];
-    CUDAVectorView<device_lib::LongIndex> result{synaptic_index.indices_ptr_ + starting_index,
-                                                 synaptic_index.offsets_ptr_[neuron_index + 1] - starting_index};
-    return result;
-}
+//__device__ CUDAVectorView<LongIndex> find_synapses_by_target(device_lib::LongIndex neuron_index,
+//                                                             const device_lib::IndexView &synaptic_index)
+//{
+//    if (synaptic_index.offsets_size_ == 0 || neuron_index >= synaptic_index.offsets_size_ - 1)
+//        return {nullptr, 0};
+//    LongIndex starting_index = synaptic_index.offsets_ptr_[neuron_index];
+//    CUDAVectorView<device_lib::LongIndex> result{synaptic_index.indices_ptr_ + starting_index,
+//                                                 synaptic_index.offsets_ptr_[neuron_index + 1] - starting_index};
+//    return result;
+//}
 
 
 template <class SynapseType, int position_index>

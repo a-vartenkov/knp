@@ -303,7 +303,7 @@ void CUDABackendImpl::calculate_populations(StepIndex step)
     {
         ::cuda::std::visit([this, step](auto &pop)
         {
-            auto spikes = calculate_population(pop, device_message_bus_, step);
+            auto spikes = calculate_population(pop, this, step);
             if (!spikes.empty())
             {
                 cuda::SpikeMessage message{MessageHeader{pop.uid_, step, false}, std::move(spikes)};

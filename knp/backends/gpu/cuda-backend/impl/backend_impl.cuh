@@ -198,8 +198,8 @@ public:
                 continue;
             }
 
-            const auto &projection = std::get<type_index>(device_projections_[i]);
-            if (projection.is_locked() && exclude_locked)
+            const auto &projection = ::cuda::std::get<type_index>(device_projections_[i]);
+            if (projection.is_locked_ && exclude_locked)
             {
                 continue;
             }
