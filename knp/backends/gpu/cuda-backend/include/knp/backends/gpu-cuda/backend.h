@@ -70,12 +70,14 @@ public:
     /**
      * @brief List of neuron types supported by the CUDA GPU backend.
      */
-    using SupportedNeurons = boost::mp11::mp_list<knp::neuron_traits::BLIFATNeuron>;
+    using SupportedNeurons = boost::mp11::mp_list<knp::neuron_traits::BLIFATNeuron,
+            knp::neuron_traits::SynapticResourceSTDPBLIFATNeuron>;
 
     /**
      * @brief List of synapse types supported by the CUDA GPU backend.
      */
-    using SupportedSynapses = boost::mp11::mp_list<knp::synapse_traits::DeltaSynapse>;
+    using SupportedSynapses = boost::mp11::mp_list<knp::synapse_traits::DeltaSynapse,
+            knp::synapse_traits::SynapticResourceSTDPDeltaSynapse>;
 
     /**
      * @brief List of supported population types based on neuron types specified in `SupportedNeurons`.

@@ -170,13 +170,12 @@ __global__ void calculate_neurons_post_impact(device_lib::CUDAVectorMutableView 
 }
 
 
-template<class Synapse>
 struct SynapsesPerNeurons
 {
     device_lib::LongIndex offsets_size_;
     device_lib::LongIndex *offsets_;
 
-    SynapseValue *synapses_;
+    SynapseValue **synapses_;
     device_lib::LongIndex synapses_size_;
 };
 
@@ -190,32 +189,32 @@ __global__ void index_to_pointer(device_lib::IndexView synapse_index, SynapseVal
 }
 
 
-__device__ device_lib::CUDAVectorMutableView<SynapseValue>
+__device__ device_lib::CUDAVectorMutableView<SynapseValue*>
     extract_synapses_from_index(
-        SynapsesPerNeurons<ResourceSynapseType> &synapse_index, device_lib::LongIndex neuron_index)
+        SynapsesPerNeurons &synapse_index, device_lib::LongIndex neuron_index)
 {
     assert(synapse_index.offsets_size_ > 0);
     device_lib::LongIndex offset = synapse_index.offsets_[neuron_index];
     device_lib::LongIndex size = synapse_index.offsets_[neuron_index + 1] - offset;
-    return device_lib::CUDAVectorMutableView<SynapseValue>{synapse_index.synapses_ + offset, size};
+    return device_lib::CUDAVectorMutableView<SynapseValue*>{synapse_index.synapses_ + offset, size};
 }
 
 
-template<class Synapse>
-__host__ SynapsesPerNeurons<Synapse> initialize_synapses_per_neurons(
+__host__ SynapsesPerNeurons initialize_synapses_per_neurons(
         const device_lib::IndexView &synapse_index,
         SynapseValue *start)
 {
-    SynapsesPerNeurons<Synapse> result;
+    SynapsesPerNeurons result;
+    SPDLOG_DEBUG("Initializing synapses_per_neurons, index:");
     call_and_check(cudaMalloc(&result.offsets_, sizeof(device_lib::LongIndex) * synapse_index.offsets_size_));
-    call_and_check(cudaMalloc(&result.synapses_, sizeof(device_lib::LongIndex) * synapse_index.indices_size_));
+    call_and_check(cudaMalloc(&result.synapses_, sizeof(void*) * synapse_index.indices_size_));
     // TODO static_assert(is_same_type(SynapsesPerNeurons::synapses_, ValueIndexView::offsets_))
     cudaMemcpy(result.offsets_, synapse_index.offsets_ptr_, sizeof(device_lib::LongIndex) * synapse_index.offsets_size_,
                cudaMemcpyDeviceToDevice);
     result.offsets_size_ = synapse_index.offsets_size_;
     result.synapses_size_ = synapse_index.indices_size_;
     auto [num_blocks, num_threads] = device_lib::get_blocks_config(synapse_index.indices_size_);
-    index_to_pointer<ResourceSynapseType><<<num_blocks, num_threads>>>(synapse_index, start, &(result.synapses_));
+    index_to_pointer<ResourceSynapseType><<<num_blocks, num_threads>>>(synapse_index, start, result.synapses_);
     return result;
 }
 
@@ -237,18 +236,18 @@ __device__ void recalculate_synapse_weight(ResourceSynapseParams &synapse_params
 }
 
 
-__global__ void add_resource_to_synapses(device_lib::CUDAVectorMutableView<SynapseValue> synapses,
+__global__ void add_resource_to_synapses(device_lib::CUDAVectorMutableView<SynapseValue*> synapses,
                                          double add_resource_value)
 {
     const device_lib::LongIndex synapse_id = blockIdx.x * blockDim.x + threadIdx.x;
     if (synapse_id >= synapses.size_) return;
-    auto &synapse = ::cuda::std::get<0>(synapses.data_[synapse_id]);
+    auto &synapse = ::cuda::std::get<0>(*synapses.data_[synapse_id]);
     synapse.rule_.synaptic_resource_ += add_resource_value;
     recalculate_synapse_weight(synapse);
 }
 
 
-__device__ void renormalize_resource(device_lib::CUDAVectorMutableView<SynapseValue> synapses,
+__device__ void renormalize_resource(device_lib::CUDAVectorMutableView<SynapseValue*> synapses,
         ResourceBlifatParams &neuron, StepIndex step)
 {
     if (step - neuron.last_step_ <= neuron.isi_max_ &&
@@ -275,13 +274,13 @@ __device__ void renormalize_resource(device_lib::CUDAVectorMutableView<SynapseVa
 
 template <class Synapse>
 __global__ void do_dopamine_plasticity_synapse_kernel(
-        device_lib::CUDAVectorMutableView<SynapseValue> synapses,
+        device_lib::CUDAVectorMutableView<SynapseValue*> synapses,
         ResourceBlifatParams *neuron, StepIndex step)
 {
     const device_lib::LongIndex synapse_id = blockIdx.x * blockDim.x + threadIdx.x;
     if (synapse_id >= synapses.size_) return;
 
-    auto &synapse = ::cuda::std::get<0>(synapses.data_[synapse_id]);
+    auto &synapse = ::cuda::std::get<0>(*synapses.data_[synapse_id]);
     if (step - neuron->last_spike_step_ <= neuron->dopamine_plasticity_time_ &&
         synapse.rule_.has_contributed_)
     {
@@ -298,7 +297,7 @@ __global__ void do_dopamine_plasticity_synapse_kernel(
 
 template<class Synapse>
 __device__ void do_dopamine_plasticity_device(
-        device_lib::CUDAVectorMutableView<SynapseValue> synapses,
+        device_lib::CUDAVectorMutableView<SynapseValue*> synapses,
         ResourceBlifatParams &neuron, StepIndex step)
 {
     auto [num_blocks, num_threads] = device_lib::get_blocks_config(synapses.size_);
@@ -322,7 +321,7 @@ __device__ void do_dopamine_plasticity_device(
 }
 
 
-__global__ void do_dopamine_plasticity_kernel(SynapsesPerNeurons<ResourceSynapseType> synapse_pointer_index,
+__global__ void do_dopamine_plasticity_kernel(SynapsesPerNeurons synapse_pointer_index,
                                               device_lib::CUDAVectorMutableView<ResourceBlifatParams> neurons,
                                               StepIndex step)
 {
@@ -394,8 +393,8 @@ device_lib::CUDAVector<SpikeIndex> calculate_population(
         SPDLOG_ERROR("Wrong projection type when extracting");
         throw std::runtime_error("Wrong type of projection extraction");
     }
-    SynapsesPerNeurons<ResourceSynapseType> synapses = initialize_synapses_per_neurons<ResourceSynapseType>(
-            projection_ptr->index_by_postsynaptic_.view(), projection_ptr->synapses_.data());
+    SynapsesPerNeurons synapses = initialize_synapses_per_neurons(projection_ptr->index_by_postsynaptic_.view(),
+                                                                  projection_ptr->synapses_.data());
 
     do_dopamine_plasticity_kernel<<<num_blocks, num_threads>>>(synapses, population.neurons_.mut_view(), step);
 
