@@ -127,6 +127,18 @@ public:
      */
     __host__ void load_populations(const knp::backends::gpu::CUDABackend::PopulationContainer &populations);
 
+    /**
+     * @brief Convert CUDA projections to core projections.
+     * @return projection container.
+     */
+     knp::backends::gpu::CUDABackend::ProjectionContainer unload_projections() const;
+
+     /*
+      * @brief Convert CUDA populations to core populations.
+      * @return population container.
+      */
+     knp::backends::gpu::CUDABackend::PopulationContainer unload_populations() const;
+
 public:
     /**
      * @brief Get an iterator pointing to the first element of the population loaded to backend.

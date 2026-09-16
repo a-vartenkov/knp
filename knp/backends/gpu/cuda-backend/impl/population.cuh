@@ -80,4 +80,19 @@ struct CUDAPopulation
     cuda::device_lib::CUDAVector<NeuronParameters> neurons_;
 };
 
+
+template <class Neuron>
+knp::core::Population<Neuron> convert_to_core_population(const CUDAPopulation<Neuron> &cuda_population)
+{
+    const auto neurons = cuda_population.neurons_.to_std();
+    auto generator = [&neurons](size_t i) -> std::optional<typename core::Population<Neuron>::NeuronParameters>
+    {
+        if (i >= neurons.size())
+            return {};
+        return neurons[i];
+    };
+    knp::core::Population<Neuron> result{to_cpu_uid(cuda_population.uid_), generator, neurons.size()};
+    return result;
+}
+
 } // namespace knp::backends::gpu::cuda

@@ -258,9 +258,9 @@ void CUDABackendImpl::load_projections(const knp::backends::gpu::CUDABackend::Pr
             using CPUProjectionType = std::decay_t<decltype(arg)>;
 
             auto proj = CUDAProjection<typename CPUProjectionType::ProjectionSynapseType>{arg};
-            SPDLOG_DEBUG("Pushing back a projection, size before: {}, pointer before: {}, capacity {}",
-                    device_projections_.size(), reinterpret_cast<void *>(device_projections_.data()),
-                    device_projections_.capacity());
+//            SPDLOG_DEBUG("Pushing back a projection, size before: {}, pointer before: {}, capacity {}",
+//                    device_projections_.size(), reinterpret_cast<void *>(device_projections_.data()),
+//                    device_projections_.capacity());
             device_projections_.push_back(proj);
             CUDA_FAST_ERROR_CHECK("Pushed back {}");
             SPDLOG_DEBUG("Pushed back: size after: {}, pointer after: {}, capacity {}", device_projections_.size(),
@@ -269,6 +269,34 @@ void CUDABackendImpl::load_projections(const knp::backends::gpu::CUDABackend::Pr
     }
 
     SPDLOG_DEBUG("All projections loaded.");
+}
+
+
+knp::backends::gpu::CUDABackend::ProjectionContainer CUDABackendImpl::unload_projections() const
+{
+    CUDABackend::ProjectionContainer result;
+    for (const auto &projection : device_projections_)
+    {
+        ::cuda::std::visit([&result](const auto &proj)
+        {
+            result.push_back(convert_to_core_projection(proj));
+        }, projection);
+    }
+    return result;
+}
+
+
+knp::backends::gpu::CUDABackend::PopulationContainer CUDABackendImpl::unload_populations() const
+{
+    CUDABackend::PopulationContainer result;
+    for (const auto &population : device_populations_)
+    {
+        ::cuda::std::visit([&result](const auto &pop)
+        {
+            result.push_back(convert_to_core_population(pop));
+        }, population);
+    }
+    return result;
 }
 
 

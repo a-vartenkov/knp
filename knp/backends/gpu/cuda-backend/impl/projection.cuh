@@ -32,6 +32,9 @@
 #include "cuda_bus/synaptic_impact_message.cuh"
 #include "uid.cuh"
 
+#include <vector>
+#include <optional>
+
 
 /**
  * @brief Namespace for CUDA backend.
@@ -186,5 +189,35 @@ struct CUDAProjection : public CUDAProjectionBase<Synapse>
 
     __host__ CUDAProjection() = default;
 };
+
+
+template <class Synapse>
+typename core::Projection<Synapse>::Synapse to_std_tuple(const typename CUDAProjection<Synapse>::Synapse &synapse)
+{
+    return std::make_tuple(
+            ::cuda::std::get<0>(synapse),
+            static_cast<size_t>(::cuda::std::get<1>(synapse)),
+            static_cast<size_t>(::cuda::std::get<2>(synapse))
+    );
+}
+
+
+template<class Synapse>
+knp::core::Projection<Synapse> convert_to_core_projection(const CUDAProjection<Synapse> &cuda_projection)
+{
+    std::vector<typename CUDAProjectionBase<Synapse>::Synapse> synapses = cuda_projection.synapses_.to_std();
+    auto generator = [&synapses](size_t i) -> std::optional<typename core::Projection<Synapse>::Synapse>
+    {
+        if (i >= synapses.size())
+            return {};
+        return to_std_tuple<Synapse>(synapses[i]);
+    };
+    knp::core::Projection<Synapse> result{to_cpu_uid(cuda_projection.uid_),
+                                          to_cpu_uid(cuda_projection.presynaptic_uid_),
+                                          to_cpu_uid(cuda_projection.postsynaptic_uid_),
+                                          generator, synapses.size()};
+    return result;
+
+}
 
 } // namespace knp::backends::gpu::cuda

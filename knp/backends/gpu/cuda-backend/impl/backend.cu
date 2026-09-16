@@ -258,6 +258,16 @@ void CUDABackend::select_device(std::unique_ptr<knp::core::Device> &&device)
 }
 
 
+/**
+ * @brief Get network data from gpu back into the internal containers.
+ */
+void CUDABackend::synchronize_network_data()
+{
+    populations_ = impl_->unload_populations();
+    projections_ = impl_->unload_projections();
+}
+
+
 void CUDABackend::_init()
 {
     SPDLOG_DEBUG("Initializing CUDABackend...");

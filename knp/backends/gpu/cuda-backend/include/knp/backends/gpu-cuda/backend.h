@@ -168,7 +168,7 @@ public:
      * 
      * @return `true` if plasticity is supported, `false` if plasticity is not supported.
      */
-    [[nodiscard]] bool plasticity_supported() const override { return false; }
+    [[nodiscard]] bool plasticity_supported() const override { return true; }
     /**
      * @brief Get type names of supported neurons.
      * 
@@ -204,7 +204,6 @@ public:
 
     /**
      * @brief Load projections to the backend.
-     * 
      * @param projections vector of projections to load.
      */
     void load_projections(const std::vector<ProjectionVariants> &projections);
@@ -342,7 +341,12 @@ public:
      * 
      * @return `DataRanges` structure containing iterators.
      */
-    [[nodiscard]] DataRanges get_network_data() const override { return {}; }
+    [[nodiscard]] DataRanges get_network_data() override;
+
+    /**
+     * @brief Get network data from gpu back into the internal containers.
+     */
+     void synchronize_network_data();
 
 protected:
     /**
@@ -354,6 +358,11 @@ protected:
      * @copydoc knp::core::Backend::_init()
      */
     void _init() override;
+
+    /**
+     * @brief Synchronizes the internal storage with backend implementation.
+     */
+    void unload_from_device();
 
 private:
     // cppcheck-suppress unusedStructMember
