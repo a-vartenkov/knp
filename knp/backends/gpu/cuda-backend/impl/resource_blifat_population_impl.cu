@@ -400,6 +400,8 @@ device_lib::CUDAVector<SpikeIndex> calculate_population(
 
     SpikeIndex size = 0;
     cudaMemcpy(&size, counter, sizeof(SpikeIndex), cudaMemcpyDeviceToHost);
+    cudaFree(synapses.offsets_);
+    cudaFree(synapses.synapses_);
     cudaFree(counter);
 
     return device_lib::CUDAVector<SpikeIndex>{output, size};
