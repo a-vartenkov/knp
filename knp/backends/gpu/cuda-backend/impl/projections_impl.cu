@@ -206,7 +206,7 @@ void CUDAProjectionBase<knp::synapse_traits::SynapticResourceSTDPDeltaSynapse>::
     message_buf_.presynaptic_population_uid_ = presynaptic_uid_;
     message_buf_.postsynaptic_population_uid_ = postsynaptic_uid_;
     message_buf_.impacts_ = device_lib::CUDAVector<SynapticImpact>{impacts, num_impacts};
-    message_buf_.is_forcing_ = false
+    message_buf_.is_forcing_ = false;
     sending_steps_.erase(sending_steps_.begin(), sending_steps_.begin() + num_impacts);
     impact_indexes_.erase(impact_indexes_.begin(), impact_indexes_.begin() + num_impacts);
 }
