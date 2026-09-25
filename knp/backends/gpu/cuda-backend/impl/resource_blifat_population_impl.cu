@@ -580,26 +580,29 @@ device_lib::CUDAVector<SpikeIndex> calculate_population(
     cudaFree(counter);
     device_lib::CUDAVector<SpikeIndex> result{output, size};
 
-    auto [num_blocks, num_threads] = device_lib::get_blocks_config(population.neurons_.size());
-    auto &projection_var = this_backend->get_projection(working_projection_indices[0]);
+    if (working_projection_indices.size() != 0)
+    {
+        auto [num_blocks, num_threads] = device_lib::get_blocks_config(population.neurons_.size());
+        auto &projection_var = this_backend->get_projection(working_projection_indices[0]);
 
-    constexpr int type_index = boost::mp11::mp_find<SupportedSynapses, ResourceSynapseType>();
-    ResourceProjection *projection_ptr = ::cuda::std::get_if<type_index>(&projection_var);
-    if (!projection_ptr)
-    {
-        SPDLOG_ERROR("Wrong projection type when extracting");
-        throw std::runtime_error("Wrong type of projection extraction");
+        constexpr int type_index = boost::mp11::mp_find<SupportedSynapses, ResourceSynapseType>();
+        ResourceProjection *projection_ptr = ::cuda::std::get_if<type_index>(&projection_var);
+        if (!projection_ptr)
+        {
+            SPDLOG_ERROR("Wrong projection type when extracting");
+            throw std::runtime_error("Wrong type of projection extraction");
+        }
+        SynapsesPerNeurons synapses = initialize_synapses_per_neurons(projection_ptr->index_by_postsynaptic_.view(),
+                                                                      projection_ptr->synapses_.data());
+        if (result.size())
+        {
+            process_spiking_neurons_impl(result, synapses, population.neurons_, step);
+        }
+        SPDLOG_WARN("Running do_dopamine_plasticity on {} blocks, {} threads", num_blocks, num_threads);
+        do_dopamine_plasticity_kernel<<<num_blocks, num_threads>>>(synapses, population.neurons_.mut_view(), step);
+        cudaFree(synapses.offsets_);
+        cudaFree(synapses.synapses_);
     }
-    SynapsesPerNeurons synapses = initialize_synapses_per_neurons(projection_ptr->index_by_postsynaptic_.view(),
-                                                                  projection_ptr->synapses_.data());
-    if (result.size())
-    {
-        process_spiking_neurons_impl(result, synapses, population.neurons_, step);
-    }
-    SPDLOG_WARN("Running do_dopamine_plasticity on {} blocks, {} threads", num_blocks, num_threads);
-    do_dopamine_plasticity_kernel<<<num_blocks, num_threads>>>(synapses, population.neurons_.mut_view(), step);
-    cudaFree(synapses.offsets_);
-    cudaFree(synapses.synapses_);
     return result;
 }
 
