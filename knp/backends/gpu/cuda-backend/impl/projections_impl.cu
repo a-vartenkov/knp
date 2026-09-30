@@ -197,6 +197,8 @@ void CUDAProjectionBase<knp::synapse_traits::DeltaSynapse>::form_message(StepInd
     message_buf_.postsynaptic_population_uid_ = postsynaptic_uid_;
     message_buf_.impacts_ = device_lib::CUDAVector<SynapticImpact>{impacts, num_impacts};
     message_buf_.is_forcing_ = true;
+    printf("Forming message: step %llu, num impacts %llu, type %d\n", current_step, message_buf_.impacts_.size(),
+           static_cast<int>(message_buf_.impacts_.copy_at(0).synapse_type_));
     sending_steps_.erase(sending_steps_.begin(), sending_steps_.begin() + num_impacts);
     impact_indexes_.erase(impact_indexes_.begin(), impact_indexes_.begin() + num_impacts);
 }
