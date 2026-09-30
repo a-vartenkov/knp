@@ -492,10 +492,12 @@ device_lib::CUDAVector<SpikeIndex> calculate_population(
 
     std::vector<device_lib::LongIndex> working_projection_indices = this_backend->find_projections_by_postsynaptic<
             synapse_traits::SynapticResourceSTDPDeltaSynapse>(population.uid_, true);
-//    if (working_projection_indices.size() == 0)
-//    {
-//        SPDLOG_WARN("No working projections found for a population");
-//    }
+    if (working_projection_indices.size() == 0)
+    {
+        const auto p_name = population.tags_.exists("name") ?
+                                     population.tags_.get_tag<std::string>("name") : "unnamed";
+        SPDLOG_WARN("No working projections found for a population \"{}\"", p_name.c_str());
+    }
 
     using ResourceProjection = CUDAProjection<synapse_traits::SynapticResourceSTDPDeltaSynapse>;
     // We have a number of projections, let's take them and for each we have a VectorView with synapses per neuron.

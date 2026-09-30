@@ -63,6 +63,7 @@ struct CUDAPopulation
      */
     __host__ explicit CUDAPopulation(const knp::core::Population<NeuronType> &population)
         : uid_{to_gpu_uid(population.get_uid())},
+          tags_{population.get_tags()},
           neurons_{population.get_neurons_parameters()}
     {
     }
@@ -78,6 +79,8 @@ struct CUDAPopulation
      * @brief Neurons.
      */
     cuda::device_lib::CUDAVector<NeuronParameters> neurons_;
+
+    knp::core::TagMap tags_;
 };
 
 
