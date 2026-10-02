@@ -92,7 +92,7 @@ __global__ void calculate_synaptic_impact(
     const size_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= size) return;
     const device_lib::LongIndex synapse_id = synapse_indices[i];
-    if (synapse_id >= synapses.size_) return;
+    if (synapse_id >= synapses.size_) return; // TODO See if we need a warning
     results[i] = synapse_id;
     auto delay = ::cuda::std::get<0>(synapses.data_[synapse_id]).delay_;
     send_steps[i] = delay + current_step - 1;
@@ -108,7 +108,7 @@ __global__ void calculate_synaptic_impact<ResourceSynapseType>(
     const size_t i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= size) return;
     const device_lib::LongIndex synapse_id = synapse_indices[i];
-    if (synapse_id >= synapses.size_) return;
+    if (synapse_id >= synapses.size_) return; // TODO See if we need a warning
     results[i] = synapse_id;
     auto delay = ::cuda::std::get<0>(synapses.data_[synapse_id]).delay_;
     send_steps[i] = delay + current_step - 1;
@@ -177,6 +177,7 @@ __global__ void delta_indices_to_impacts_kernel(device_lib::LongIndex *indices_b
 template<>
 void CUDAProjectionBase<knp::synapse_traits::DeltaSynapse>::form_message(StepIndex current_step)
 {
+    SPDLOG_DEBUG("Forming message for delta synapse");
     using Synapse = knp::synapse_traits::DeltaSynapse;
     auto iter = thrust::upper_bound(thrust::device, sending_steps_.begin(), sending_steps_.end(), current_step);
     if (iter == sending_steps_.begin())
@@ -197,7 +198,7 @@ void CUDAProjectionBase<knp::synapse_traits::DeltaSynapse>::form_message(StepInd
     message_buf_.postsynaptic_population_uid_ = postsynaptic_uid_;
     message_buf_.impacts_ = device_lib::CUDAVector<SynapticImpact>{impacts, num_impacts};
     message_buf_.is_forcing_ = true;
-    printf("Forming message: step %llu, num impacts %llu, type %d\n", current_step, message_buf_.impacts_.size(),
+    printf("Formed message: step %llu, num impacts %llu, type %d\n", current_step, message_buf_.impacts_.size(),
            static_cast<int>(message_buf_.impacts_.copy_at(0).synapse_type_));
     sending_steps_.erase(sending_steps_.begin(), sending_steps_.begin() + num_impacts);
     impact_indexes_.erase(impact_indexes_.begin(), impact_indexes_.begin() + num_impacts);
@@ -255,6 +256,7 @@ __host__ void calculate_projection(
         {
             device_lib::LongIndex impacts_count = count_values_by_indexes(projection.index_,
                     device_lib::CUDAVectorView<SpikeIndex>{msg_data_pointer_cpu, data_size});
+            printf("Impacts count: %llu\n", impacts_count);
 
             device_lib::LongIndex *impacts_buffer;
             device_lib::LongIndex *delay_buffer;
@@ -275,10 +277,18 @@ __host__ void calculate_projection(
             thrust::sort_by_key(thrust::device, delay_buffer, delay_buffer + impacts_count, impacts_buffer);
             projection.add_impacts(device_lib::CUDAVector<device_lib::LongIndex>{impacts_buffer, impacts_count},
                                    device_lib::CUDAVector<device_lib::LongIndex>{delay_buffer, impacts_count});
+            // TODO TEMP
+            {
+                const auto synapse = ::cuda::std::get<0>(projection.synapses_.copy_at(0));
+                if (static_cast<int>(synapse.output_type_) == 3)
+                    printf("Projection of size %llu got message of size %lu; impacts %llu\n",
+                           projection.synapses_.size(), data_size, impacts_count);
+            }
+            // END TEMP
         }
-        // Make messages
-        projection.form_message(step_n);
     }
+    // Make messages
+    projection.form_message(step_n);
 }
 
 
@@ -324,9 +334,9 @@ __host__ void calculate_projection(
             projection.add_impacts(device_lib::CUDAVector<device_lib::LongIndex>{impacts_buffer, impacts_count},
                                    device_lib::CUDAVector<device_lib::LongIndex>{delay_buffer, impacts_count});
         }
-        // Make messages
-        projection.form_message(step_n);
     }
+    // Make messages
+    projection.form_message(step_n);
 }
 
 

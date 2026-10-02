@@ -402,8 +402,8 @@ __global__ void do_dopamine_plasticity_synapse_kernel(
     if (synapse_id >= synapses.size_ || neuron->dopamine_value_ == 0) return;
     // printf("Starting do_dopamine_plasticity_kernel for nonzero dopamine value\n");
     auto &synapse = ::cuda::std::get<0>(*synapses.data_[synapse_id]);
-    if (synapse.rule_.has_contributed_) printf("Step %lu, neuron last step %lu, plasticity time %u\n",
-                                               step, neuron->last_spike_step_, neuron->dopamine_plasticity_time_);
+//    if (synapse.rule_.has_contributed_) printf("Step %lu, neuron last step %lu, plasticity time %u\n",
+//                                               step, neuron->last_spike_step_, neuron->dopamine_plasticity_time_);
     if (step - neuron->last_spike_step_ <= neuron->dopamine_plasticity_time_ && synapse.rule_.has_contributed_)
     {
         // Change synapse resource.

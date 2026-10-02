@@ -335,8 +335,9 @@ void CUDABackendImpl::calculate_populations(StepIndex step)
             if (!spikes.empty())
             {
                 cuda::SpikeMessage message{MessageHeader{pop.uid_, step, false}, std::move(spikes)};
-                SPDLOG_DEBUG("Population {} created a message with {} spikes", std::string(to_cpu_uid(pop.uid_)),
-                             message.neuron_indexes_.size());
+                SPDLOG_DEBUG("Population {} created a message with {} spikes on step {}",
+                             std::string(to_cpu_uid(pop.uid_)),
+                             message.neuron_indexes_.size(), step);
                 device_message_bus_.send_message(std::move(message));
             }
             else

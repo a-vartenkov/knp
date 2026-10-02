@@ -118,7 +118,8 @@ struct CUDAProjectionBase
         assert(new_impacts_indexes.size() == new_sending_steps.size());
         if (new_impacts_indexes.size() == 0) return;
         const auto size = new_impacts_indexes.size();
-        const auto out_size = new_impacts_indexes.size() + impact_indexes_.size();
+        const auto size_before = impact_indexes_.size();
+        const auto out_size = size + size_before;
         device_lib::LongIndex *res_steps;
         device_lib::LongIndex *res_impacts;
         cudaMalloc(&res_steps, sizeof(device_lib::LongIndex) * out_size);
